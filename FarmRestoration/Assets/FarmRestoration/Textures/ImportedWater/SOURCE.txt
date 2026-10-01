@@ -1,0 +1,5 @@
+Source: D:\ThienAn\PhamVanHung\82ad3ff00dc55f22ff21faaf97952de0.fbx
+
+The source FBX has one mesh with about 750,000 vertices and four embedded 4096x4096 atlas textures. Repeating that mesh along the entire river would be too expensive for the Android target and its atlas also contains non-water colours.
+
+RiverWaterFromModel.png is a small seamless crop from the source's blue surface. WaterHeightFromModel.png is a 128x128 height sample of the source mesh. ReferenceLandscapeSetup uses both to build an optimized curved 3D water surface. The original FBX was not changed or copied into Unity Assets.

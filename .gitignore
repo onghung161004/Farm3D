@@ -1,0 +1,30 @@
+# Unity-generated folders
+FarmRestoration/[Ll]ibrary/
+FarmRestoration/[Tt]emp/
+FarmRestoration/[Oo]bj/
+FarmRestoration/[Ll]ogs/
+FarmRestoration/[Uu]ser[Ss]ettings/
+FarmRestoration/[Mm]emoryCaptures/
+FarmRestoration/[Rr]ecordings/
+FarmRestoration/[Bb]uild/
+FarmRestoration/[Bb]uilds/
+
+# IDE and OS metadata
+.vs/
+.idea/
+.superpowers/
+*.csproj
+*.sln
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.suo
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+
+# Terrain & Grass Pack demo data (not required by the farm scene and exceeds GitHub's file limit)
+FarmRestoration/Assets/FlipGameDev/Terrain&GrassPack/Demo/Demo/LightingData.asset
+FarmRestoration/Assets/FlipGameDev/Terrain&GrassPack/Terrain_Settings/Data/Demo.asset

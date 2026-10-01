@@ -1,0 +1,17 @@
+{
+  "name": "FarmRestoration.Runtime",
+  "rootNamespace": "FarmRestoration",
+  "references": [
+    "Unity.InputSystem",
+    "Unity.TextMeshPro"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

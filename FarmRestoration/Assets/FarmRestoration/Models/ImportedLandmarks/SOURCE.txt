@@ -1,0 +1,8 @@
+Original GLB models (kept unchanged):
+- D:\ThienAn\PhamVanHung\Núi1.glb -> MountainA.obj
+- D:\ThienAn\PhamVanHung\Núi2.glb -> MountainB.obj
+- D:\ThienAn\PhamVanHung\Cầu.glb -> RiverBridge.obj
+
+Each original has about 1.5 million triangles. UV-preserving quadric decimation reduced the three OBJ files to about 55k, 45k and 100k triangles respectively, without the holes produced by simple vertex clustering. Their colour and normal textures are in Textures/ImportedLandmarks: mountains are 1024x1024, and the closer bridge is 2048x2048.
+
+To regenerate: use Tools/convert_glb_landmark.py to export a full OBJ and embedded PNGs, then Tools/optimize_landmark_mesh.py (requires PyMeshLab) to create the final OBJ. Downsample the 4096x4096 PNGs to the listed sizes before importing into Unity. The supplied GLB sources were not deleted or changed.
