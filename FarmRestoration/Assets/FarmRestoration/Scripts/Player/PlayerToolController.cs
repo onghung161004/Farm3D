@@ -12,6 +12,8 @@ namespace FarmRestoration
 
         [SerializeField] private Camera interactionCamera;
         [SerializeField, Min(0.1f)] private float interactionRange = 3f;
+        [SerializeField, Min(0.05f)] private float batchHoldSeconds = 0.25f;
+        [SerializeField, Min(0.05f)] private float batchPlotInterval = 0.18f;
         [SerializeField] private LayerMask interactionMask = Physics.DefaultRaycastLayers;
 
         private readonly RaycastHit[] raycastHits = new RaycastHit[8];
@@ -20,6 +22,14 @@ namespace FarmRestoration
         private IInteractionTargetQuery targetQuery;
         private IInteractable currentTarget;
         private string currentPrompt;
+        private Transform heldGarden;
+        private FarmPlot heldTapPlot;
+        private FarmPlot[] batchPlots;
+        private FarmTool heldTool;
+        private float heldSince;
+        private float nextBatchTime;
+        private int batchIndex;
+        private bool batchStarted;
 
         public FarmTool SelectedTool { get; private set; } = FarmTool.Hoe;
         public string CurrentPrompt => currentPrompt;
@@ -48,15 +58,94 @@ namespace FarmRestoration
             UpdateInteractionPrompt();
 
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && keyboard.eKey.wasPressedThisFrame)
+            if (keyboard != null) HandleInteractKey(keyboard);
+
+            if (keyboard != null && keyboard.rKey.wasPressedThisFrame
+                && TryFindTarget(out IInteractable recipeTarget)
+                && recipeTarget is FarmProductionStation station && station.CycleRecipe())
             {
-                TryUseTool();
+                UpdateInteractionPrompt();
             }
 
-            if (keyboard != null && keyboard.gKey.wasPressedThisFrame)
+        }
+
+        private void OnDisable() => CancelHeldGarden();
+
+        private void HandleInteractKey(Keyboard keyboard)
+        {
+            if (keyboard.eKey.wasPressedThisFrame)
             {
-                TryAdvanceDemoGrowth();
+                IInteractable target = TryFindTarget(out IInteractable found) ? found : null;
+                if (target != null && !(target is FarmPlot))
+                {
+                    TryUseTool();
+                    return;
+                }
+
+                Transform garden = FarmGardenBatch.FindNearest(transform.position, interactionRange);
+                if (garden == null)
+                {
+                    TryUseTool();
+                    return;
+                }
+
+                heldGarden = garden;
+                heldTapPlot = target as FarmPlot;
+                if (heldTapPlot == null || !heldTapPlot.transform.IsChildOf(garden))
+                    heldTapPlot = null;
+                heldTool = SelectedTool;
+                heldSince = Time.unscaledTime;
+                batchPlots = FarmGardenBatch.GetOrderedPlots(garden, transform.position);
+                batchIndex = 0;
+                batchStarted = false;
             }
+
+            if (heldGarden == null) return;
+            if (SelectedTool != heldTool
+                || !FarmGardenBatch.IsWithinRange(heldGarden, transform.position, interactionRange))
+            {
+                CancelHeldGarden();
+                return;
+            }
+
+            if (keyboard.eKey.wasReleasedThisFrame)
+            {
+                if (!batchStarted)
+                {
+                    FarmPlot tapPlot = heldTapPlot != null ? heldTapPlot
+                        : batchPlots != null && batchPlots.Length > 0 ? batchPlots[0] : null;
+                    UsePlot(tapPlot);
+                }
+                CancelHeldGarden();
+                return;
+            }
+
+            if (!keyboard.eKey.isPressed || Time.unscaledTime - heldSince < batchHoldSeconds) return;
+            if (!batchStarted)
+            {
+                batchStarted = true;
+                nextBatchTime = Time.unscaledTime;
+            }
+            if (batchPlots == null || batchIndex >= batchPlots.Length || Time.unscaledTime < nextBatchTime) return;
+
+            UsePlot(batchPlots[batchIndex++]);
+            nextBatchTime = Time.unscaledTime + batchPlotInterval;
+        }
+
+        private void UsePlot(FarmPlot plot)
+        {
+            if (plot == null || !plot.isActiveAndEnabled) return;
+            if (PlayerToolInteraction.TryUse(plot, heldTool)) ToolUsedSuccessfully?.Invoke(heldTool);
+            UpdateInteractionPrompt();
+        }
+
+        private void CancelHeldGarden()
+        {
+            heldGarden = null;
+            heldTapPlot = null;
+            batchPlots = null;
+            batchIndex = 0;
+            batchStarted = false;
         }
 
         public void ConfigureInteractionCamera(Camera cameraToUse)
@@ -138,6 +227,8 @@ namespace FarmRestoration
                 return;
             }
 
+            CancelHeldGarden();
+
             SelectedTool = nextTool;
             PublishSelection();
             UpdateInteractionPrompt();
@@ -152,6 +243,8 @@ namespace FarmRestoration
         {
             IInteractable target = TryFindTarget(out IInteractable foundTarget) ? foundTarget : null;
             string nextPrompt = target == null ? NoTargetPrompt : target.GetInteractionPrompt(SelectedTool);
+            if (target is FarmPlot plot && FarmGardenBatch.IsGardenPlot(plot))
+                nextPrompt += "  |  Hold E: all 9 plots";
             if (ReferenceEquals(currentTarget, target) && currentPrompt == nextPrompt)
             {
                 return;

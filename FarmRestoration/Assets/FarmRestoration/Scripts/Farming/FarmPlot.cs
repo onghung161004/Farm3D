@@ -17,9 +17,13 @@ namespace FarmRestoration
 
         public FarmPlotState CurrentState { get; private set; } = FarmPlotState.Untilled;
         public CropType CropType => cropType;
+        public long GrowthReadyUtcTicks { get; private set; }
 
         public event Action<int> Harvested;
         public event Action<CropType, int> CropHarvested;
+        public event Action<FarmPlot> StateChanged;
+
+        private int GrowthSeconds => cropType == CropType.Carrot ? 45 : cropType == CropType.Tomato ? 60 : 75;
 
         private void Start()
         {
@@ -31,6 +35,11 @@ namespace FarmRestoration
             }
 
             ApplyVisuals();
+        }
+
+        private void Update()
+        {
+            TickGrowth(DateTime.UtcNow);
         }
 
         public bool TryInteract(FarmTool tool)
@@ -49,12 +58,14 @@ namespace FarmRestoration
 
             if (CurrentState == FarmPlotState.Seeded && tool == FarmTool.WateringCan)
             {
+                GrowthReadyUtcTicks = DateTime.UtcNow.AddSeconds(GrowthSeconds).Ticks;
                 SetState(FarmPlotState.Watered);
                 return true;
             }
 
             if (CurrentState == FarmPlotState.ReadyToHarvest && tool == FarmTool.Harvest)
             {
+                GrowthReadyUtcTicks = 0;
                 SetState(FarmPlotState.Untilled);
                 Harvested?.Invoke(1);
                 CropHarvested?.Invoke(cropType, 1);
@@ -74,11 +85,36 @@ namespace FarmRestoration
 
             if (CurrentState == FarmPlotState.Growing)
             {
+                GrowthReadyUtcTicks = 0;
                 SetState(FarmPlotState.ReadyToHarvest);
                 return true;
             }
 
             return false;
+        }
+
+        public void TickGrowth(DateTime nowUtc)
+        {
+            if (GrowthReadyUtcTicks <= 0 || (CurrentState != FarmPlotState.Watered && CurrentState != FarmPlotState.Growing)) return;
+            if (nowUtc.Ticks >= GrowthReadyUtcTicks)
+            {
+                GrowthReadyUtcTicks = 0;
+                SetState(FarmPlotState.ReadyToHarvest);
+            }
+            else if (CurrentState == FarmPlotState.Watered
+                && nowUtc.Ticks >= GrowthReadyUtcTicks - TimeSpan.FromSeconds(GrowthSeconds / 2f).Ticks)
+            {
+                SetState(FarmPlotState.Growing);
+            }
+        }
+
+        public void Restore(FarmPlotState state, long readyUtcTicks, DateTime nowUtc)
+        {
+            if (!Enum.IsDefined(typeof(FarmPlotState), state)) state = FarmPlotState.Untilled;
+            GrowthReadyUtcTicks = state == FarmPlotState.Watered || state == FarmPlotState.Growing
+                ? (readyUtcTicks > 0 ? readyUtcTicks : nowUtc.AddSeconds(GrowthSeconds).Ticks) : 0;
+            SetState(state);
+            TickGrowth(nowUtc);
         }
 
         public string GetInteractionPrompt(FarmTool tool)
@@ -100,7 +136,8 @@ namespace FarmRestoration
 
             if (CurrentState == FarmPlotState.Watered || CurrentState == FarmPlotState.Growing)
             {
-                return "Crop is growing - press G to advance demo growth";
+                int seconds = Math.Max(0, (int)Math.Ceiling((GrowthReadyUtcTicks - DateTime.UtcNow.Ticks) / (double)TimeSpan.TicksPerSecond));
+                return "Crop growing: " + seconds + "s remaining";
             }
 
             return tool == FarmTool.Harvest ? "Harvest crop" : "Select Harvest";
@@ -132,6 +169,7 @@ namespace FarmRestoration
         {
             CurrentState = nextState;
             ApplyVisuals();
+            StateChanged?.Invoke(this);
         }
 
         private void ApplyVisuals()

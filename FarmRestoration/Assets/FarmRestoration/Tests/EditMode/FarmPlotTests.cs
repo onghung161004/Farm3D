@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -31,7 +32,7 @@ namespace FarmRestoration.Tests.EditMode
         [TearDown]
         public void TearDown()
         {
-            Object.DestroyImmediate(plotObject);
+            UnityEngine.Object.DestroyImmediate(plotObject);
         }
 
         [Test]
@@ -91,6 +92,29 @@ namespace FarmRestoration.Tests.EditMode
             Assert.That(didAdvance, Is.False);
             Assert.That(plot.CurrentState, Is.EqualTo(FarmPlotState.Untilled));
             AssertOnlyVisualIsActive(0);
+        }
+
+        [Test]
+        public void WateredPlot_BecomesHarvestableAfterDeadlineWithoutKeyboardShortcut()
+        {
+            plot.TryInteract(FarmTool.Hoe);
+            plot.TryInteract(FarmTool.Seeds);
+            plot.TryInteract(FarmTool.WateringCan);
+            Assert.That(plot.GrowthReadyUtcTicks, Is.GreaterThan(DateTime.UtcNow.Ticks));
+
+            plot.TickGrowth(new DateTime(plot.GrowthReadyUtcTicks + 1, DateTimeKind.Utc));
+
+            Assert.That(plot.CurrentState, Is.EqualTo(FarmPlotState.ReadyToHarvest));
+            AssertOnlyVisualIsActive(5);
+        }
+
+        [Test]
+        public void RestoreWateredPlot_AppliesTimeElapsedWhileGameWasClosed()
+        {
+            plot.Restore(FarmPlotState.Watered, DateTime.UtcNow.AddSeconds(-10).Ticks, DateTime.UtcNow);
+
+            Assert.That(plot.CurrentState, Is.EqualTo(FarmPlotState.ReadyToHarvest));
+            Assert.That(plot.GrowthReadyUtcTicks, Is.Zero);
         }
 
         private GameObject CreateVisual(string name)

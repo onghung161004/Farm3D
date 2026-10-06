@@ -14,6 +14,11 @@ namespace FarmRestoration.Editor
         [MenuItem("Tools/Farm Restoration/Build American Ranch With Farm Ranch Pack")]
         public static void BuildRanch()
         {
+            if (PolytopeNatureSetup.HasPack())
+            {
+                CoherentFarmsteadSetup.Rebuild();
+                return;
+            }
             Scene scene = SceneManager.GetActiveScene();
             if (scene.path != FarmDemo)
             {

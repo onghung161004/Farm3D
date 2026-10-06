@@ -7,6 +7,8 @@ namespace FarmRestoration
     [DisallowMultipleComponent]
     public sealed class FarmHud : MonoBehaviour
     {
+        private static readonly int SharpnessProperty = Shader.PropertyToID("_Sharpness");
+        private static readonly int OutlineWidthProperty = Shader.PropertyToID("_OutlineWidth");
         [SerializeField] private PlayerToolController toolController;
         [SerializeField] private FarmPlot farmPlot;
         [SerializeField] private TMP_Text toolLabel;
@@ -23,15 +25,39 @@ namespace FarmRestoration
         public InventoryState Inventory => inventory;
         public CropInventory CropInventory => cropInventory;
 
+        public void RefreshInventory() => SetCropSummary();
+
         private void OnEnable()
         {
+            ConfigureTextRendering();
             Subscribe();
+            cropInventory.Changed += OnCropInventoryChanged;
             Refresh();
         }
 
         private void OnDisable()
         {
+            cropInventory.Changed -= OnCropInventoryChanged;
             Unsubscribe();
+        }
+
+        private void OnCropInventoryChanged(CropType type, int count) => SetCropSummary();
+
+        private void ConfigureTextRendering()
+        {
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+                canvas.pixelPerfect = true;
+
+            foreach (TextMeshProUGUI label in GetComponentsInChildren<TextMeshProUGUI>(true))
+            {
+                Material material = label.fontMaterial;
+                if (material == null) continue;
+                if (material.HasProperty(SharpnessProperty)) material.SetFloat(SharpnessProperty, 0.65f);
+                if (material.HasProperty(OutlineWidthProperty))
+                    material.SetFloat(OutlineWidthProperty, Mathf.Min(material.GetFloat(OutlineWidthProperty), 0.06f));
+                label.SetMaterialDirty();
+            }
         }
 
         public void ConfigureSources(PlayerToolController controller, FarmPlot plot)

@@ -52,8 +52,9 @@ namespace FarmRestoration.Editor
             root.localScale = Vector3.one;
             ClearChildren(root);
 
-            Material grass = GetMaterial("ValleyGrass", lit, new Color(0.72f, 0.85f, 0.67f), "Grass_Leaves_1_AlbedoTransparency.png", new Vector2(20f, 20f));
-            Material road = GetMaterial("ValleyRoad", lit, new Color(0.73f, 0.56f, 0.36f), "Road_AlbedoTransparency.png", new Vector2(1f, 8f));
+            Material grass = GetMaterial("ValleyGrass", lit, new Color(0.92f, 1f, 0.88f), "Grass_AlbedoTransparency.png", new Vector2(14f, 14f));
+            Material road = GetMaterial("ValleyRoad", lit, new Color(0.88f, 0.70f, 0.44f), "Road_AlbedoTransparency.png", new Vector2(1f, 8f));
+            Material soil = GetMaterial("ValleySoil", lit, new Color(0.84f, 0.62f, 0.36f), "Mud_AlbedoTransparency.png", new Vector2(4f, 4f));
             Material water = GetWaterMaterial(lit);
             Material riverbank = GetMaterial("ValleyBank", lit, new Color(0.58f, 0.49f, 0.34f), "Sand_AlbedoTransparency.png", new Vector2(1f, 8f));
             Material rock = GetMaterial("ValleyRock", lit, new Color(0.52f, 0.57f, 0.56f), "Rockwall_AlbedoTransparency.png", new Vector2(4f, 4f));
@@ -68,6 +69,7 @@ namespace FarmRestoration.Editor
             HideOldLandscape();
             BuildRiver(root, water, riverbank);
             BuildRoads(root, road);
+            BuildSoilPatches(root, soil);
             if (!ImportedLandmarksSetup.PlaceBridge(root)) BuildBridge(root, wood);
             BuildVillage(root, lit);
             BuildForests(root, lit);
@@ -75,6 +77,9 @@ namespace FarmRestoration.Editor
             BuildRiverbankStones(root);
             BuildMeadows(root);
             if (!ImportedLandmarksSetup.PlaceMountains(root)) BuildMountains(root, rock, snow);
+            FarmDayNightSetup.Install(scene);
+            if (PolytopeNatureSetup.HasPack()) PolytopeNatureSetup.ApplyToRoot(root);
+            if (PolytopeNatureSetup.HasPack()) CoherentFarmsteadSetup.ApplyToScene(scene);
 
             EditorUtility.SetDirty(root.gameObject);
             EditorSceneManager.MarkSceneDirty(scene);
@@ -158,6 +163,28 @@ namespace FarmRestoration.Editor
         }
 
         internal static float GroundHeightAt(float x, float z) => HeightAt(x, z);
+        internal static float GroundDistanceToRiver(Vector2 point) => DistanceToRiver(point);
+
+        /// <summary>Returns the bridge crossing directly from the river spline, not hard-coded world axes.</summary>
+        internal static void GetBridgeAlignment(out Vector3 center, out Vector3 bridgeDirection)
+        {
+            Vector3 requested = new Vector3(-41f, 0f, 39f);
+            int nearest = 0;
+            float nearestDistance = float.MaxValue;
+            for (int i = 0; i < RiverCurve.Count; i++)
+            {
+                float distance = (RiverCurve[i] - requested).sqrMagnitude;
+                if (distance >= nearestDistance) continue;
+                nearestDistance = distance;
+                nearest = i;
+            }
+
+            Vector3 before = RiverCurve[Mathf.Max(0, nearest - 2)];
+            Vector3 after = RiverCurve[Mathf.Min(RiverCurve.Count - 1, nearest + 2)];
+            Vector3 riverTangent = new Vector3(after.x - before.x, 0f, after.z - before.z).normalized;
+            bridgeDirection = new Vector3(riverTangent.z, 0f, -riverTangent.x).normalized;
+            center = new Vector3(RiverCurve[nearest].x, 0f, RiverCurve[nearest].z);
+        }
 
         private static float Hill(float x, float z, float cx, float cz, float height, float radius)
         {
@@ -320,19 +347,69 @@ namespace FarmRestoration.Editor
 
         private static void BuildRoads(Transform root, Material road)
         {
+            GetBridgeAlignment(out Vector3 bridgeCenter, out Vector3 bridgeDirection);
+            const float bridgeApproach = 9.8f;
+            Vector2 bridgeEastEnd = new Vector2(bridgeCenter.x + bridgeDirection.x * bridgeApproach, bridgeCenter.z + bridgeDirection.z * bridgeApproach);
+            Vector2 bridgeWestEnd = new Vector2(bridgeCenter.x - bridgeDirection.x * bridgeApproach, bridgeCenter.z - bridgeDirection.z * bridgeApproach);
             Vector2[] villageRoad =
             {
-                new Vector2(-20f, 24f), new Vector2(-28f, 29f), new Vector2(-40f, 37f),
-                new Vector2(-53f, 45f), new Vector2(-70f, 51f)
+                new Vector2(-20f, 24f), new Vector2(-28f, 29f), bridgeEastEnd
+            };
+            Vector2[] villageApproach =
+            {
+                bridgeWestEnd, new Vector2(-53f, 45f), new Vector2(-70f, 51f)
             };
             Vector2[] eastRoad =
             {
                 new Vector2(24f, -18f), new Vector2(39f, -8f), new Vector2(51f, 13f),
                 new Vector2(70f, 19f), new Vector2(90f, 31f)
             };
-            CreateRibbon(root, "VillageDirtRoad", SampleCurve(villageRoad, 7), 2.5f, 0.07f, road, true);
+            CreateRibbon(root, "BridgeEastApproach", SampleCurve(villageRoad, 7), 2.5f, 0.07f, road, true);
+            CreateRibbon(root, "VillageDirtRoad", SampleCurve(villageApproach, 7), 2.5f, 0.07f, road, true);
             CreateRibbon(root, "EasternDirtRoad", SampleCurve(eastRoad, 7), 2.3f, 0.07f, road, true);
         }
+
+        internal static void RefreshBridgeRoads(Transform valley, Material road)
+        {
+            foreach (string name in new[] { "BridgeEastApproach", "VillageDirtRoad", "EasternDirtRoad" })
+            {
+                Transform old = valley.Find(name);
+                if (old != null) UnityEngine.Object.DestroyImmediate(old.gameObject);
+            }
+            BuildRoads(valley, road);
+        }
+
+        private static void BuildSoilPatches(Transform root, Material soil)
+        {
+            CreateGroundPatch(root, "VillageSquareSoil", new Vector2(-63f, 51f), new Vector2(20f, 13f), soil);
+            CreateGroundPatch(root, "VillageRoadsideSoil", new Vector2(-47f, 42f), new Vector2(10f, 6f), soil);
+            CreateGroundPatch(root, "EasternRoadsideSoil", new Vector2(43f, -4f), new Vector2(9f, 5f), soil);
+        }
+
+        private static void CreateGroundPatch(Transform root, string name, Vector2 center, Vector2 size, Material material)
+        {
+            GameObject patch = new GameObject(name, typeof(MeshFilter), typeof(MeshRenderer));
+            patch.transform.SetParent(root, false);
+            Mesh mesh = GetMesh("Illustrated" + name);
+            float halfWidth = size.x * 0.5f, halfDepth = size.y * 0.5f;
+            Vector3[] vertices =
+            {
+                TerrainPoint(center.x - halfWidth, center.y - halfDepth),
+                TerrainPoint(center.x + halfWidth, center.y - halfDepth),
+                TerrainPoint(center.x - halfWidth, center.y + halfDepth),
+                TerrainPoint(center.x + halfWidth, center.y + halfDepth)
+            };
+            mesh.Clear();
+            mesh.vertices = vertices;
+            mesh.uv = new[] { Vector2.zero, Vector2.right, Vector2.up, Vector2.one };
+            mesh.triangles = new[] { 0, 2, 1, 1, 2, 3 };
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            patch.GetComponent<MeshFilter>().sharedMesh = mesh;
+            patch.GetComponent<MeshRenderer>().sharedMaterial = material;
+        }
+
+        private static Vector3 TerrainPoint(float x, float z) => new Vector3(x, HeightAt(x, z) + 0.055f, z);
 
         private static void BuildBridge(Transform root, Material wood)
         {
@@ -353,11 +430,10 @@ namespace FarmRestoration.Editor
         {
             Transform village = new GameObject("RiversideVillage").transform;
             village.SetParent(root, false);
-            PlaceRanch(village, "Bld_FarmerHouse", "VillageHouse_A", -58f, 44f, 0.58f, 15f);
-            PlaceRanch(village, "Bld_FarmerHouse", "VillageHouse_B", -66f, 51f, 0.48f, -18f);
-            PlaceRanch(village, "Bld_StoreBuilding_01", "VillageShop", -51f, 52f, 0.55f, 45f);
-            PlaceRanch(village, "Bld_FarmMill_01", "HillWindmill", -74f, 68f, 0.70f, -25f);
-            PlaceRanch(village, "Bld_Barn_02", "VillageBarn", -75f, 42f, 0.54f, 10f);
+            // Village Houses Pack owns the homes, well and fences around the road square.
+            FarmVillageHousesSetup.BuildVillageUnder(village, GroundHeightAt, lit);
+            // Keep the working-farm landmarks outside the residential square.
+            PlaceRanch(village, "Bld_FarmMill_01", "HillWindmill", -88f, 78f, 0.70f, -25f);
             LiteFarmPackUrpMaterialFix.ConvertMaterialsUnder(village, lit, "ConvertedValleyVillage");
         }
 

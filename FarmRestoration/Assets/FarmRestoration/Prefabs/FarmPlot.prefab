@@ -1340,6 +1340,7 @@ GameObject:
   - component: {fileID: 4892539138093278809}
   - component: {fileID: 4043758905706284311}
   - component: {fileID: 2785758597438350861}
+  - component: {fileID: 7925405791294462014}
   m_Layer: 0
   m_Name: FarmPlot
   m_TagString: Untagged
@@ -1407,6 +1408,25 @@ MonoBehaviour:
   wateredVisual: {fileID: 384982271152168369}
   growingVisual: {fileID: 5112419899083230008}
   readyToHarvestVisual: {fileID: 650203247017257891}
+--- !u!114 &7925405791294462014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5358627427511692308}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48c0d649d7724f5c8d07babebda818fe, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: FarmRestoration.Runtime::FarmRestoration.CartoonCropVisuals
+  dirtPile: {fileID: 1000011580534764, guid: c26cacf51e485c54b95fdbf9ad976ddf, type: 3}
+  pumpkinPlant: {fileID: 1000010824186820, guid: 30319199574ca3644bf3898bb5cac486, type: 3}
+  pumpkinFruit: {fileID: 1000012003911730, guid: 0adfa404918648e42a1fb073ef9010d3, type: 3}
+  carrotPlant: {fileID: 1000013410243764, guid: 56b36da289d9a9e4cb37c5f588e23748, type: 3}
+  carrotFruit: {fileID: 1000014111768446, guid: 2cf13a738fc434c46bda5ebf7ca44756, type: 3}
+  tomatoPlant: {fileID: 1000013832410636, guid: 323e5d46aea633c42bfadb66b36971d8, type: 3}
+  tomatoFruit: {fileID: 1000010004241426, guid: ad3b2f45225bb0c4f8f80eacd5111af1, type: 3}
 --- !u!1 &6309246319818199262
 GameObject:
   m_ObjectHideFlags: 0

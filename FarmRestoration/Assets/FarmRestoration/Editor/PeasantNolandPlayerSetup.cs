@@ -9,6 +9,7 @@ namespace FarmRestoration.Editor
     {
         private const string FarmDemo = "Assets/FarmRestoration/Scenes/FarmDemo.unity";
         private const string PeasantPrefab = "Assets/Stylized NPC - Peasant Nolant/Prefabs/Peasant Nolant Green(Free Version).prefab";
+        private const string PlayerController = "Assets/FarmRestoration/Animations/PeasantPlayer.controller";
 
         [MenuItem("Tools/Farm Restoration/Replace Player With Peasant Noland")]
         public static void ReplacePlayer()
@@ -41,7 +42,12 @@ namespace FarmRestoration.Editor
             visual.transform.localScale = Vector3.one * 1.5f;
 
             Animator animator = visual.GetComponent<Animator>();
-            if (animator != null) animator.applyRootMotion = false;
+            if (animator != null)
+            {
+                animator.applyRootMotion = false;
+                RuntimeAnimatorController controller = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(PlayerController);
+                if (controller != null) animator.runtimeAnimatorController = controller;
+            }
             PlayerMovement movement = player.GetComponent<PlayerMovement>();
             PeasantAnimatorDriver driver = player.GetComponent<PeasantAnimatorDriver>();
             if (driver == null) driver = Undo.AddComponent<PeasantAnimatorDriver>(player);

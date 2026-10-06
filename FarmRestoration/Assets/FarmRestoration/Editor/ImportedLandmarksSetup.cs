@@ -15,8 +15,6 @@ namespace FarmRestoration.Editor
         private const string TextureFolder = "Assets/FarmRestoration/Textures/ImportedLandmarks/";
         private const string MaterialFolder = "Assets/FarmRestoration/Materials/ImportedLandmarks";
         private const string WalkwayMeshPath = "Assets/FarmRestoration/Models/Generated/ImportedBridgeWalkway.asset";
-        private static readonly Vector3 BridgeCenter = new Vector3(-41f, 0f, 37f);
-        private static readonly Vector3 BridgeDirection = new Vector3(0.95f, 0f, -0.30f).normalized;
 
         [MenuItem("Tools/Farm Restoration/Place Imported Mountains and Bridge")]
         public static void PlaceInCurrentScene()
@@ -69,17 +67,18 @@ namespace FarmRestoration.Editor
                 return false;
             }
             RemoveNamedChildren(root, "ImportedRiverBridge", "ImportedBridgeWalkway", "BridgePlank_");
+            ReferenceLandscapeSetup.GetBridgeAlignment(out Vector3 bridgeCenter, out Vector3 bridgeDirection);
             bridge.name = "ImportedRiverBridge";
             bridge.transform.localScale = Vector3.one * (10.6f / renderer.bounds.size.z);
-            bridge.transform.rotation = Quaternion.LookRotation(BridgeDirection, Vector3.up);
+            bridge.transform.rotation = Quaternion.LookRotation(bridgeDirection, Vector3.up);
             renderer = bridge.GetComponentInChildren<Renderer>();
-            Vector3 offset = new Vector3(BridgeCenter.x - renderer.bounds.center.x,
+            Vector3 offset = new Vector3(bridgeCenter.x - renderer.bounds.center.x,
                 0.9f - renderer.bounds.max.y,
-                BridgeCenter.z - renderer.bounds.center.z);
+                bridgeCenter.z - renderer.bounds.center.z);
             bridge.transform.position += offset;
             foreach (Renderer part in bridge.GetComponentsInChildren<Renderer>(true)) part.sharedMaterial = material;
             foreach (Collider part in bridge.GetComponentsInChildren<Collider>(true)) part.enabled = false;
-            CreateBridgeWalkway(root);
+            CreateBridgeWalkway(root, bridgeCenter, bridgeDirection);
             return true;
         }
 
@@ -134,7 +133,7 @@ namespace FarmRestoration.Editor
             return true;
         }
 
-        private static void CreateBridgeWalkway(Transform root)
+        private static void CreateBridgeWalkway(Transform root, Vector3 bridgeCenter, Vector3 bridgeDirection)
         {
             GameObject walkway = new GameObject("ImportedBridgeWalkway", typeof(MeshCollider));
             walkway.transform.SetParent(root, false);
@@ -145,13 +144,13 @@ namespace FarmRestoration.Editor
                 AssetDatabase.CreateAsset(mesh, WalkwayMeshPath);
             }
             float[] distances = { -5.4f, -3.1f, 3.1f, 5.4f };
-            Vector3 right = new Vector3(-BridgeDirection.z, 0f, BridgeDirection.x);
+            Vector3 right = new Vector3(-bridgeDirection.z, 0f, bridgeDirection.x);
             Vector3[] vertices = new Vector3[distances.Length * 2];
             List<int> triangles = new List<int>();
             for (int row = 0; row < distances.Length; row++)
             for (int side = 0; side < 2; side++)
             {
-                Vector3 point = BridgeCenter + BridgeDirection * distances[row]
+                Vector3 point = bridgeCenter + bridgeDirection * distances[row]
                     + right * (side == 0 ? -2.05f : 2.05f);
                 point.y = row == 0 || row == distances.Length - 1
                     ? ReferenceLandscapeSetup.GroundHeightAt(point.x, point.z) + 0.04f

@@ -31,10 +31,10 @@ namespace FarmRestoration.Editor
             Transform root = GetOrCreateRoot(scene, "CropGardens").transform;
             ClearChildren(root);
 
-            // Three separate directions from the player spawn: south-west, north, and south-east.
-            CreateGarden(plotPrefab, root, "PumpkinGarden", CropType.Pumpkin, new Vector3(-12.0f, 0.08f, -6.5f), "food_Pumpkin");
-            CreateGarden(plotPrefab, root, "CarrotGarden", CropType.Carrot, new Vector3(-1.5f, 0.08f, 8.0f), "food_Carrot");
-            CreateGarden(plotPrefab, root, "TomatoGarden", CropType.Tomato, new Vector3(12.0f, 0.08f, -6.5f), "food_Tomato");
+            // Gardens follow the farm trail rather than forming a symmetric display grid.
+            CreateGarden(plotPrefab, root, "PumpkinGarden", CropType.Pumpkin, CoherentFarmsteadSetup.PumpkinCenter, "food_Pumpkin");
+            CreateGarden(plotPrefab, root, "CarrotGarden", CropType.Carrot, CoherentFarmsteadSetup.CarrotCenter, "food_Carrot");
+            CreateGarden(plotPrefab, root, "TomatoGarden", CropType.Tomato, CoherentFarmsteadSetup.TomatoCenter, "food_Tomato");
 
             EditorSceneManager.MarkSceneDirty(scene);
             AssetDatabase.SaveAssets();
