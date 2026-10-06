@@ -12,6 +12,29 @@ Nếu Unity mở scene trống `Untitled`, bản đồ không bị mất: hãy m
 
 > `Assets/Scenes/SampleScene.unity` là scene mẫu của Unity, **không phải** bản đồ game. Khi tạo bản build, hãy chọn `FarmDemo.unity` làm scene khởi đầu trong Build Profiles/Scene List.
 
+## Clone và tải texture bằng Git LFS
+
+Một số texture núi lớn được lưu bằng **Git LFS**. Trên mỗi máy mới, hãy [cài Git LFS](https://git-lfs.com/) trước khi mở dự án trong Unity. Trong PowerShell hoặc terminal của SourceTree, chạy:
+
+```powershell
+git lfs install
+git clone https://github.com/onghung161004/Farm3D.git
+cd Farm3D
+git lfs pull
+```
+
+Nếu đã clone dự án từ trước, mở terminal tại thư mục `Farm3D` rồi chạy:
+
+```powershell
+git lfs install
+git pull
+git lfs pull
+```
+
+Kiểm tra bằng `git lfs ls-files`: repository hiện có 3 texture núi được quản lý bằng LFS. Nếu file `.png` chỉ chứa vài dòng bắt đầu bằng `version https://git-lfs.github.com/spec/v1` thay vì ảnh thật, chạy lại `git lfs pull` và kiểm tra kết nối/quyền tải LFS. Sau đó mở thư mục `FarmRestoration/` bằng Unity Hub và chờ Unity nhập lại asset.
+
+Khi bổ sung một file lớn mới, dùng `git lfs track "đường/dẫn/file"` **trước khi** `git add`; commit cả `.gitattributes`, file asset và file `.meta` đi kèm. Không đưa `Library/` hoặc các file cache Unity lên Git.
+
 ## Điều khiển và vòng chơi
 
 | Phím | Chức năng |
