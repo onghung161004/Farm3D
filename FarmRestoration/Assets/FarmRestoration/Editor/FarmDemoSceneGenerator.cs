@@ -90,6 +90,7 @@ namespace FarmRestoration.Editor
 
             GameObject cameraObject = new GameObject("Main Camera");
             Camera camera = cameraObject.AddComponent<Camera>();
+            cameraObject.AddComponent<AudioListener>();
             cameraObject.tag = "MainCamera";
             camera.transform.position = new Vector3(0f, 14f, -14f);
             camera.transform.rotation = Quaternion.Euler(42f, 0f, 0f);

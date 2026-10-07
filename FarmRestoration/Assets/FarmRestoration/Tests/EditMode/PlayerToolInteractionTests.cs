@@ -75,6 +75,41 @@ namespace FarmRestoration.Tests.EditMode
             Assert.That(outOfRangeTarget.InteractionCount, Is.EqualTo(0));
         }
 
+        [Test]
+        public void TryUseTool_Success_PublishesToolAndTargetOnce()
+        {
+            controllerObject = new GameObject("PlayerControllerTest");
+            PlayerToolController controller = controllerObject.AddComponent<PlayerToolController>();
+            TestInteractable target = CreateTarget();
+            controller.ConfigureTargetQuery(new OutOfRangeTargetQuery(target));
+            int eventCount = 0;
+            controller.InteractionSucceeded += (tool, interacted) =>
+            {
+                eventCount++;
+                Assert.That(tool, Is.EqualTo(FarmTool.Hoe));
+                Assert.That(interacted, Is.SameAs(target));
+            };
+
+            Assert.That(controller.TryUseTool(), Is.True);
+            Assert.That(eventCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TryUseTool_FailedAction_DoesNotPublishSuccess()
+        {
+            controllerObject = new GameObject("PlayerControllerTest");
+            PlayerToolController controller = controllerObject.AddComponent<PlayerToolController>();
+            TestInteractable target = CreateTarget();
+            target.ShouldSucceed = false;
+            controller.ConfigureTargetQuery(new OutOfRangeTargetQuery(target));
+            int eventCount = 0;
+            controller.InteractionSucceeded += (_, __) => eventCount++;
+
+            Assert.That(controller.TryUseTool(), Is.False);
+            Assert.That(target.InteractionCount, Is.EqualTo(1));
+            Assert.That(eventCount, Is.Zero);
+        }
+
         private TestInteractable CreateTarget()
         {
             targetObject = new GameObject("InteractionTargetTest");
@@ -113,6 +148,7 @@ namespace FarmRestoration.Tests.EditMode
 
     public sealed class TestInteractable : MonoBehaviour, IInteractable
     {
+        public bool ShouldSucceed { get; set; } = true;
         public int InteractionCount { get; private set; }
 
         public FarmTool LastTool { get; private set; }
@@ -121,7 +157,7 @@ namespace FarmRestoration.Tests.EditMode
         {
             InteractionCount++;
             LastTool = tool;
-            return true;
+            return ShouldSucceed;
         }
 
         public string GetInteractionPrompt(FarmTool tool)

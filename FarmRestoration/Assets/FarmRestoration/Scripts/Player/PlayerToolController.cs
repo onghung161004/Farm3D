@@ -36,6 +36,7 @@ namespace FarmRestoration
 
         public event Action<FarmTool> SelectedToolChanged;
         public event Action<FarmTool> ToolUsedSuccessfully;
+        public event Action<FarmTool, IInteractable> InteractionSucceeded;
         public event Action<string> InteractionPromptChanged;
 
         private void Awake()
@@ -135,7 +136,7 @@ namespace FarmRestoration
         private void UsePlot(FarmPlot plot)
         {
             if (plot == null || !plot.isActiveAndEnabled) return;
-            if (PlayerToolInteraction.TryUse(plot, heldTool)) ToolUsedSuccessfully?.Invoke(heldTool);
+            if (PlayerToolInteraction.TryUse(plot, heldTool)) PublishSuccessfulInteraction(heldTool, plot);
             UpdateInteractionPrompt();
         }
 
@@ -176,10 +177,16 @@ namespace FarmRestoration
             bool didInteract = PlayerToolInteraction.TryUse(target, SelectedTool);
             if (didInteract)
             {
-                ToolUsedSuccessfully?.Invoke(SelectedTool);
+                PublishSuccessfulInteraction(SelectedTool, target);
             }
             UpdateInteractionPrompt();
             return didInteract;
+        }
+
+        private void PublishSuccessfulInteraction(FarmTool tool, IInteractable target)
+        {
+            ToolUsedSuccessfully?.Invoke(tool);
+            InteractionSucceeded?.Invoke(tool, target);
         }
 
         public bool TryAdvanceDemoGrowth()

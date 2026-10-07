@@ -12,15 +12,20 @@ namespace FarmRestoration
         private readonly int[] products = new int[3];
         private readonly bool[] repairs = new bool[2];
         private FarmPlot[] plots = Array.Empty<FarmPlot>();
+        private CowAnimal[] cows = Array.Empty<CowAnimal>();
         private FarmHud hud;
         private int coins;
         private int orderIndex;
+        private int milk;
         private bool ready;
         private bool inTransaction;
 
         public static FarmProgression Instance { get; private set; }
         public int Coins => coins;
         public int OrderIndex => orderIndex;
+        public int MilkCount => milk;
+        public int CarrotCount => hud == null ? 0 : hud.CropInventory.GetCount(CropType.Carrot);
+        private int OrderCycleLength => cows.Length > 0 || milk > 0 ? 7 : 6;
         public event Action Changed;
 
         private string SavePath => Path.Combine(Application.persistentDataPath, SaveFile);
@@ -36,8 +41,10 @@ namespace FarmRestoration
             hud = GetComponent<FarmHud>() ?? FindAnyObjectByType<FarmHud>();
             if (hud == null) { Debug.LogError("FarmProgression needs the FarmHud inventory.", this); enabled = false; return; }
             plots = FindObjectsByType<FarmPlot>();
+            cows = FindObjectsByType<CowAnimal>();
             RestoreGame();
             foreach (FarmPlot plot in plots) plot.StateChanged += OnPlotChanged;
+            foreach (CowAnimal cow in cows) cow.StateChanged += OnCowChanged;
             hud.CropInventory.Changed += OnInventoryChanged;
             ready = true;
             Changed?.Invoke();
@@ -47,6 +54,7 @@ namespace FarmRestoration
         {
             if (Instance == this) Instance = null;
             foreach (FarmPlot plot in plots) if (plot != null) plot.StateChanged -= OnPlotChanged;
+            foreach (CowAnimal cow in cows) if (cow != null) cow.StateChanged -= OnCowChanged;
             if (hud != null) hud.CropInventory.Changed -= OnInventoryChanged;
         }
 
@@ -55,6 +63,29 @@ namespace FarmRestoration
 
         public int ProductCount(CropType type) => products[(int)type];
         public bool IsRepaired(int index) => index >= 0 && index < repairs.Length && repairs[index];
+
+        public bool TryFeedCow(CowAnimal cow)
+        {
+            if (!ready || cow == null || !cow.CanFeed) return false;
+            inTransaction = true;
+            bool spent = hud.CropInventory.TrySpend(CropType.Carrot, 1);
+            if (spent) cow.Feed(DateTime.UtcNow);
+            inTransaction = false;
+            if (spent) NotifyAndSave();
+            return spent;
+        }
+
+        public bool TryMilkCow(CowAnimal cow)
+        {
+            if (!ready || cow == null) return false;
+            inTransaction = true;
+            bool collected = cow.Milk(DateTime.UtcNow);
+            inTransaction = false;
+            if (!collected) return false;
+            milk++;
+            NotifyAndSave();
+            return true;
+        }
 
         public bool TryProduce(CropType crop, int cropCost = 2)
         {
@@ -71,8 +102,18 @@ namespace FarmRestoration
         public bool TryDeliverOrder()
         {
             if (!ready) return false;
-            int cropIndex = orderIndex % 3;
-            bool productOrder = orderIndex % 6 >= 3;
+            int step = orderIndex % OrderCycleLength;
+            if (step == 6)
+            {
+                if (milk < 1) return false;
+                milk--;
+                coins += 20;
+                orderIndex++;
+                NotifyAndSave();
+                return true;
+            }
+            int cropIndex = step % 3;
+            bool productOrder = step >= 3;
             if (productOrder)
             {
                 if (products[cropIndex] < 1) return false;
@@ -93,12 +134,15 @@ namespace FarmRestoration
 
         public string OrderDescription()
         {
-            CropType crop = (CropType)(orderIndex % 3);
-            bool productOrder = orderIndex % 6 >= 3;
+            int step = orderIndex % OrderCycleLength;
+            if (step == 6) return "1 milk";
+            CropType crop = (CropType)(step % 3);
+            bool productOrder = step >= 3;
             return productOrder ? "1 " + ProductName(crop) : "3 " + crop;
         }
 
-        public int OrderReward => orderIndex % 6 >= 3 ? 25 : 12;
+        public int OrderReward => orderIndex % OrderCycleLength == 6 ? 20
+            : orderIndex % OrderCycleLength >= 3 ? 25 : 12;
 
         public bool TryRepair(int index, int price)
         {
@@ -113,6 +157,7 @@ namespace FarmRestoration
             : crop == CropType.Carrot ? "carrot juice" : "tomato sauce";
 
         private void OnPlotChanged(FarmPlot plot) => SaveGame();
+        private void OnCowChanged(CowAnimal cow) { if (!inTransaction) SaveGame(); }
         private void OnInventoryChanged(CropType crop, int count) { if (!inTransaction) { NotifyAndSave(); } }
         private void NotifyAndSave() { Changed?.Invoke(); SaveGame(); }
 
@@ -125,14 +170,17 @@ namespace FarmRestoration
                 products = (int[])products.Clone(),
                 coins = coins,
                 orderIndex = orderIndex,
+                milk = milk,
                 repairs = (bool[])repairs.Clone(),
-                plots = new PlotSaveData[plots.Length]
+                plots = new PlotSaveData[plots.Length],
+                cows = new CowSaveData[cows.Length]
             };
             for (int i = 0; i < plots.Length; i++)
             {
                 FarmPlot plot = plots[i];
                 data.plots[i] = new PlotSaveData { id = PlotId(plot), state = (int)plot.CurrentState, readyUtcTicks = plot.GrowthReadyUtcTicks };
             }
+            for (int i = 0; i < cows.Length; i++) data.cows[i] = cows[i].Snapshot();
             try
             {
                 Directory.CreateDirectory(Application.persistentDataPath);
@@ -160,6 +208,7 @@ namespace FarmRestoration
                 for (int i = 0; i < repairs.Length; i++) repairs[i] = data.repairs != null && i < data.repairs.Length && data.repairs[i];
                 coins = Math.Max(0, data.coins);
                 orderIndex = Math.Max(0, data.orderIndex);
+                milk = Math.Max(0, data.milk);
                 Dictionary<string, PlotSaveData> savedPlots = new Dictionary<string, PlotSaveData>();
                 if (data.plots != null)
                     foreach (PlotSaveData saved in data.plots)
@@ -167,6 +216,12 @@ namespace FarmRestoration
                 foreach (FarmPlot plot in plots)
                     if (savedPlots.TryGetValue(PlotId(plot), out PlotSaveData saved))
                         plot.Restore((FarmPlotState)saved.state, saved.readyUtcTicks, DateTime.UtcNow);
+                Dictionary<string, CowSaveData> savedCows = new Dictionary<string, CowSaveData>();
+                if (data.cows != null)
+                    foreach (CowSaveData saved in data.cows)
+                        if (saved != null && !string.IsNullOrEmpty(saved.id)) savedCows[saved.id] = saved;
+                foreach (CowAnimal cow in cows)
+                    if (savedCows.TryGetValue(cow.CowId, out CowSaveData saved)) cow.Restore(saved);
                 hud.RefreshInventory();
             }
             catch (Exception ex)
@@ -177,6 +232,7 @@ namespace FarmRestoration
                 Array.Clear(repairs, 0, repairs.Length);
                 coins = 0;
                 orderIndex = 0;
+                milk = 0;
                 foreach (FarmPlot plot in plots) plot.Restore(FarmPlotState.Untilled, 0, DateTime.UtcNow);
                 hud.RefreshInventory();
             }

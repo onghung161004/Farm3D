@@ -210,7 +210,8 @@ namespace FarmRestoration.Editor
 
         private static void CreateWalkway(Transform layer, Vector3 center, Vector3 direction, Collider bridge)
         {
-            GameObject walkway = new GameObject("PolytopeBridgeWalkway", typeof(MeshCollider));
+            GameObject walkway = new GameObject("PolytopeBridgeWalkway", typeof(MeshCollider), typeof(FootstepSurface));
+            walkway.GetComponent<FootstepSurface>().Configure(FootstepSurface.Kind.Wood);
             walkway.transform.SetParent(layer, false);
             Mesh mesh = AssetDatabase.LoadAssetAtPath<Mesh>(WalkwayPath);
             if (mesh == null)

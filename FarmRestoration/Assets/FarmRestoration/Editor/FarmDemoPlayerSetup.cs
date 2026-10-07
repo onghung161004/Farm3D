@@ -71,6 +71,11 @@ namespace FarmRestoration.Editor
                 camera = cameraObject.GetComponent<Camera>() ?? Undo.AddComponent<Camera>(cameraObject);
             }
 
+            if (camera.GetComponent<AudioListener>() == null)
+            {
+                Undo.AddComponent<AudioListener>(camera.gameObject);
+            }
+
             PlayerFollowCamera followCamera = camera.GetComponent<PlayerFollowCamera>();
             if (followCamera == null)
             {

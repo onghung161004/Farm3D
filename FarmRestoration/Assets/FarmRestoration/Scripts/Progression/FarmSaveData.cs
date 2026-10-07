@@ -12,6 +12,8 @@ namespace FarmRestoration
         public int coins;
         public int orderIndex;
         public bool[] repairs = new bool[2];
+        public int milk;
+        public CowSaveData[] cows = Array.Empty<CowSaveData>();
     }
 
     [Serializable]
@@ -20,5 +22,15 @@ namespace FarmRestoration
         public string id;
         public int state;
         public long readyUtcTicks;
+    }
+
+    [Serializable]
+    public sealed class CowSaveData
+    {
+        public string id;
+        public bool penned;
+        public float x;
+        public float z;
+        public long milkReadyUtcTicks;
     }
 }

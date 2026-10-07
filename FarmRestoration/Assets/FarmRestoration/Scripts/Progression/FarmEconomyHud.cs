@@ -25,7 +25,8 @@ namespace FarmRestoration
             if (label == null) return;
             FarmProgression state = game != null ? game : FarmProgression.Instance;
             label.text = state == null ? "Village loading..."
-                : "COINS  " + state.Coins + "\nSoup " + state.ProductCount(CropType.Pumpkin)
+                : "COINS  " + state.Coins + "  MILK " + state.MilkCount
+                + "\nSoup " + state.ProductCount(CropType.Pumpkin)
                 + "  Juice " + state.ProductCount(CropType.Carrot)
                 + "  Sauce " + state.ProductCount(CropType.Tomato)
                 + "\nORDER  " + state.OrderDescription();
