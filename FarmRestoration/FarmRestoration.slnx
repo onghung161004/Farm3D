@@ -1,0 +1,7 @@
+﻿<Solution>
+  <Project Path="FarmRestoration.EditModeTests.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="FarmRestoration.Editor.csproj" />
+  <Project Path="FarmRestoration.Runtime.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+</Solution>
