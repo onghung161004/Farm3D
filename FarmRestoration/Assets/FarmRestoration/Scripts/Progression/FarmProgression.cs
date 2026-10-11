@@ -20,9 +20,12 @@ namespace FarmRestoration
         private bool ready;
         private bool inTransaction;
         private readonly bool[] unlockedGardens = new bool[] { false, true, false };
+        private readonly List<ActiveTimedOrder> activeTimedOrders = new List<ActiveTimedOrder>();
 
-        public static FarmProgression Instance { get; private set; }
+        public static FarmProgression Instance { get; set; }
         public SeedInventory SeedInventory { get; } = new SeedInventory();
+        public IReadOnlyList<ActiveTimedOrder> ActiveTimedOrders => activeTimedOrders;
+        public int ActiveOrdersCount => activeTimedOrders.Count;
         public int Coins => coins;
         public int OrderIndex => orderIndex;
         public int MilkCount => milk;
@@ -72,6 +75,11 @@ namespace FarmRestoration
         private void OnApplicationPause(bool paused) { if (paused) SaveGame(); }
         private void OnApplicationQuit() => SaveGame();
 
+        private void Update()
+        {
+            if (ready) MaintainTimedOrders(DateTime.UtcNow);
+        }
+
         public void ConfigureForTests(FarmHud testHud, FarmPlot[] testPlots, int initialCoins = 15)
         {
             hud = testHud;
@@ -79,6 +87,7 @@ namespace FarmRestoration
             cows = Array.Empty<CowAnimal>();
             coins = initialCoins;
             ready = true;
+            MaintainTimedOrders(DateTime.UtcNow);
         }
 
         public int ProductCount(CropType type) => products[(int)type];
@@ -237,59 +246,177 @@ namespace FarmRestoration
             return true;
         }
 
+        private static readonly TimedOrderTemplate[] OrderTemplates = new[]
+        {
+            new TimedOrderTemplate("Carrot_Small", CropType.Carrot, false, 2, 12, 6, 90f, 40f),
+            new TimedOrderTemplate("Carrot_Juice", CropType.Carrot, true, 1, 18, 8, 120f, 50f),
+            new TimedOrderTemplate("Carrot_Bulk", CropType.Carrot, false, 3, 18, 8, 110f, 45f),
+            new TimedOrderTemplate("Pumpkin_Small", CropType.Pumpkin, false, 2, 22, 10, 110f, 45f),
+            new TimedOrderTemplate("Pumpkin_Soup", CropType.Pumpkin, true, 1, 28, 12, 140f, 60f),
+            new TimedOrderTemplate("Tomato_Small", CropType.Tomato, false, 2, 20, 10, 100f, 45f),
+            new TimedOrderTemplate("Tomato_Sauce", CropType.Tomato, true, 1, 26, 12, 130f, 55f)
+        };
+
+        public readonly struct TimedOrderTemplate
+        {
+            public readonly string id;
+            public readonly CropType crop;
+            public readonly bool product;
+            public readonly int amount;
+            public readonly int reward;
+            public readonly int bonus;
+            public readonly float timeLimit;
+            public readonly float fastLimit;
+
+            public TimedOrderTemplate(string id, CropType crop, bool product, int amount, int reward, int bonus, float timeLimit, float fastLimit)
+            {
+                this.id = id;
+                this.crop = crop;
+                this.product = product;
+                this.amount = amount;
+                this.reward = reward;
+                this.bonus = bonus;
+                this.timeLimit = timeLimit;
+                this.fastLimit = fastLimit;
+            }
+        }
+
+        public void MaintainTimedOrders(DateTime nowUtc)
+        {
+            for (int i = activeTimedOrders.Count - 1; i >= 0; i--)
+            {
+                if (activeTimedOrders[i].IsExpired(nowUtc))
+                {
+                    activeTimedOrders.RemoveAt(i);
+                }
+            }
+
+            List<TimedOrderTemplate> available = new List<TimedOrderTemplate>();
+            for (int i = 0; i < OrderTemplates.Length; i++)
+            {
+                if (IsGardenUnlocked(OrderTemplates[i].crop))
+                {
+                    available.Add(OrderTemplates[i]);
+                }
+            }
+
+            if (available.Count > 0)
+            {
+                int attempts = 0;
+                while (activeTimedOrders.Count < 3 && attempts < 15)
+                {
+                    attempts++;
+                    TimedOrderTemplate template = available[(orderIndex + activeTimedOrders.Count + attempts) % available.Count];
+                    ActiveTimedOrder newOrder = new ActiveTimedOrder
+                    {
+                        id = template.id + "_" + Guid.NewGuid().ToString("N").Substring(0, 4),
+                        customer = "Village Trader",
+                        cropType = template.crop,
+                        isProduct = template.product,
+                        amount = template.amount,
+                        baseReward = template.reward,
+                        fastBonus = template.bonus,
+                        expiryUtcTicks = nowUtc.AddSeconds(template.timeLimit).Ticks,
+                        fastBonusUtcTicks = nowUtc.AddSeconds(template.fastLimit).Ticks
+                    };
+                    activeTimedOrders.Add(newOrder);
+                }
+            }
+        }
+
+        public ActiveTimedOrder GetNearestDeadlineOrder(DateTime nowUtc)
+        {
+            MaintainTimedOrders(nowUtc);
+            ActiveTimedOrder nearest = null;
+            long minTicks = long.MaxValue;
+            for (int i = 0; i < activeTimedOrders.Count; i++)
+            {
+                if (activeTimedOrders[i].expiryUtcTicks < minTicks)
+                {
+                    minTicks = activeTimedOrders[i].expiryUtcTicks;
+                    nearest = activeTimedOrders[i];
+                }
+            }
+            return nearest;
+        }
+
+        public string GetNearestDeadlineSummary(DateTime nowUtc)
+        {
+            ActiveTimedOrder nearest = GetNearestDeadlineOrder(nowUtc);
+            if (nearest == null) return "None";
+            int sec = nearest.RemainingSeconds(nowUtc);
+            bool fast = nearest.IsFastDelivery(nowUtc);
+            return $"{nearest.ItemDescription} in {sec}s" + (fast ? $" (+{nearest.fastBonus}c bonus)" : "");
+        }
+
+        public bool CanFulfillOrder(ActiveTimedOrder o)
+        {
+            if (o == null) return false;
+            if (o.isProduct) return products[(int)o.cropType] >= o.amount;
+            return hud != null && hud.CropInventory.GetCount(o.cropType) >= o.amount;
+        }
+
         public bool TryDeliverOrder()
         {
             if (!ready) return false;
-            int step = orderIndex % OrderCycleLength;
-            if (step == 6)
+            DateTime now = DateTime.UtcNow;
+            MaintainTimedOrders(now);
+
+            int targetIndex = -1;
+            for (int i = 0; i < activeTimedOrders.Count; i++)
             {
-                if (milk < 1) return false;
-                milk--;
-                coins += 20;
-                orderIndex++;
-                MoneyEarned?.Invoke(20);
-                AnyMoneyEarned?.Invoke(20);
-                OrderDelivered?.Invoke(orderIndex);
-                AnyOrderDelivered?.Invoke(orderIndex);
-                NotifyAndSave();
-                return true;
+                if (CanFulfillOrder(activeTimedOrders[i]))
+                {
+                    targetIndex = i;
+                    break;
+                }
             }
-            int cropIndex = step % 3;
-            bool productOrder = step >= 3;
-            if (productOrder)
+
+            if (targetIndex < 0) return false;
+            ActiveTimedOrder order = activeTimedOrders[targetIndex];
+
+            if (order.isProduct)
             {
-                if (products[cropIndex] < 1) return false;
-                products[cropIndex]--;
+                products[(int)order.cropType] -= order.amount;
             }
             else
             {
                 inTransaction = true;
-                bool spent = hud.CropInventory.TrySpend((CropType)cropIndex, 3);
+                bool spent = hud.CropInventory.TrySpend(order.cropType, order.amount);
                 inTransaction = false;
                 if (!spent) return false;
             }
-            int earned = productOrder ? 25 : 12;
-            coins += earned;
+
+            int reward = order.TotalReward(now);
+            activeTimedOrders.RemoveAt(targetIndex);
+            MaintainTimedOrders(now);
+
+            coins += reward;
             orderIndex++;
-            MoneyEarned?.Invoke(earned);
-            AnyMoneyEarned?.Invoke(earned);
+            MoneyEarned?.Invoke(reward);
+            AnyMoneyEarned?.Invoke(reward);
             OrderDelivered?.Invoke(orderIndex);
             AnyOrderDelivered?.Invoke(orderIndex);
+            FarmAudioFeedback.PlayCoin();
             NotifyAndSave();
             return true;
         }
 
         public string OrderDescription()
         {
-            int step = orderIndex % OrderCycleLength;
-            if (step == 6) return "1 milk";
-            CropType crop = (CropType)(step % 3);
-            bool productOrder = step >= 3;
-            return productOrder ? "1 " + ProductName(crop) : "3 " + crop;
+            ActiveTimedOrder nearest = GetNearestDeadlineOrder(DateTime.UtcNow);
+            if (nearest == null) return "No orders";
+            return $"{nearest.ItemDescription} ({nearest.RemainingSeconds(DateTime.UtcNow)}s left)";
         }
 
-        public int OrderReward => orderIndex % OrderCycleLength == 6 ? 20
-            : orderIndex % OrderCycleLength >= 3 ? 25 : 12;
+        public int OrderReward
+        {
+            get
+            {
+                ActiveTimedOrder nearest = GetNearestDeadlineOrder(DateTime.UtcNow);
+                return nearest != null ? nearest.TotalReward(DateTime.UtcNow) : 15;
+            }
+        }
 
         public bool TryRepair(int index, int price)
         {
@@ -325,7 +452,8 @@ namespace FarmRestoration
                 cows = new CowSaveData[cows.Length],
                 questData = QuestManager.Instance != null ? QuestManager.Instance.ExportSaveData() : null,
                 seeds = SeedInventory.Snapshot(),
-                unlockedGardens = (bool[])unlockedGardens.Clone()
+                unlockedGardens = (bool[])unlockedGardens.Clone(),
+                timedOrders = ExportTimedOrders()
             };
             for (int i = 0; i < plots.Length; i++)
             {
@@ -390,6 +518,7 @@ namespace FarmRestoration
                     unlockedGardens[1] = true;
                     unlockedGardens[2] = false;
                 }
+                RestoreTimedOrders(data.timedOrders, DateTime.UtcNow);
                 hud.RefreshInventory();
             }
             catch (Exception ex)
@@ -405,6 +534,7 @@ namespace FarmRestoration
                 unlockedGardens[0] = false;
                 unlockedGardens[1] = true;
                 unlockedGardens[2] = false;
+                RestoreTimedOrders(null, DateTime.UtcNow);
                 foreach (FarmPlot plot in plots) plot.Restore(FarmPlotState.Untilled, 0, DateTime.UtcNow);
                 if (QuestManager.Instance != null)
                 {
@@ -412,6 +542,53 @@ namespace FarmRestoration
                 }
                 hud.RefreshInventory();
             }
+        }
+
+        public TimedOrderSaveData[] ExportTimedOrders()
+        {
+            TimedOrderSaveData[] saves = new TimedOrderSaveData[activeTimedOrders.Count];
+            for (int i = 0; i < activeTimedOrders.Count; i++)
+            {
+                ActiveTimedOrder o = activeTimedOrders[i];
+                saves[i] = new TimedOrderSaveData
+                {
+                    id = o.id,
+                    cropType = (int)o.cropType,
+                    isProduct = o.isProduct,
+                    amount = o.amount,
+                    reward = o.baseReward,
+                    bonus = o.fastBonus,
+                    expiryUtcTicks = o.expiryUtcTicks,
+                    fastBonusUtcTicks = o.fastBonusUtcTicks
+                };
+            }
+            return saves;
+        }
+
+        public void RestoreTimedOrders(TimedOrderSaveData[] saves, DateTime nowUtc)
+        {
+            activeTimedOrders.Clear();
+            if (saves != null && saves.Length > 0)
+            {
+                for (int i = 0; i < saves.Length; i++)
+                {
+                    TimedOrderSaveData s = saves[i];
+                    if (s == null) continue;
+                    activeTimedOrders.Add(new ActiveTimedOrder
+                    {
+                        id = s.id,
+                        customer = "Village Trader",
+                        cropType = (CropType)s.cropType,
+                        isProduct = s.isProduct,
+                        amount = s.amount,
+                        baseReward = s.reward,
+                        fastBonus = s.bonus,
+                        expiryUtcTicks = s.expiryUtcTicks,
+                        fastBonusUtcTicks = s.fastBonusUtcTicks
+                    });
+                }
+            }
+            MaintainTimedOrders(nowUtc);
         }
 
         private static string PlotId(FarmPlot plot) => plot.transform.parent.name + "/" + plot.name;

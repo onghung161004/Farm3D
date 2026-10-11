@@ -20,6 +20,16 @@ namespace FarmRestoration
 
         private void OnDestroy() { if (game != null) game.Changed -= Refresh; }
 
+        private float nextTick;
+        private void Update()
+        {
+            if (Time.unscaledTime >= nextTick)
+            {
+                nextTick = Time.unscaledTime + 1f;
+                Refresh();
+            }
+        }
+
         private void Refresh()
         {
             if (label == null) return;
@@ -29,7 +39,7 @@ namespace FarmRestoration
                 + "\nSoup " + state.ProductCount(CropType.Pumpkin)
                 + "  Juice " + state.ProductCount(CropType.Carrot)
                 + "  Sauce " + state.ProductCount(CropType.Tomato)
-                + "\nORDER  " + state.OrderDescription();
+                + "\nORDER  " + state.GetNearestDeadlineSummary(System.DateTime.UtcNow);
         }
     }
 }

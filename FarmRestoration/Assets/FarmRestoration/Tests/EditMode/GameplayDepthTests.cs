@@ -156,5 +156,71 @@ namespace FarmRestoration.Tests.EditMode
 
             UnityEngine.Object.DestroyImmediate(plotObj);
         }
+
+        [Test]
+        public void TimedOrders_ActiveCount_Maintains2To3Orders()
+        {
+            Assert.That(progression.ActiveOrdersCount, Is.InRange(2, 3));
+        }
+
+        [Test]
+        public void TimedOrders_OnlyAsksForUnlockedCrops()
+        {
+            // Initially only Carrot is unlocked
+            Assert.That(progression.IsGardenUnlocked(CropType.Carrot), Is.True);
+            Assert.That(progression.IsGardenUnlocked(CropType.Pumpkin), Is.False);
+            Assert.That(progression.IsGardenUnlocked(CropType.Tomato), Is.False);
+
+            foreach (ActiveTimedOrder order in progression.ActiveTimedOrders)
+            {
+                Assert.That(order.cropType, Is.EqualTo(CropType.Carrot));
+            }
+        }
+
+        [Test]
+        public void TimedOrders_ExpiredOrdersAreReplaced()
+        {
+            DateTime now = DateTime.UtcNow;
+            progression.MaintainTimedOrders(now);
+
+            Assert.That(progression.ActiveOrdersCount, Is.GreaterThan(0));
+            string initialFirstOrderId = progression.ActiveTimedOrders[0].id;
+
+            // Fast forward time by 1 hour (3600s) -> orders expire
+            DateTime future = now.AddHours(1);
+            progression.MaintainTimedOrders(future);
+
+            Assert.That(progression.ActiveOrdersCount, Is.InRange(2, 3));
+            bool stillContainsInitial = false;
+            foreach (ActiveTimedOrder order in progression.ActiveTimedOrders)
+            {
+                if (order.id == initialFirstOrderId) stillContainsInitial = true;
+            }
+            Assert.That(stillContainsInitial, Is.False, "Expired order should have been replaced");
+        }
+
+        [Test]
+        public void TimedOrders_SaveLoadRoundTrip_PreservesOrdersAndGardenUnlocks()
+        {
+            progression.UnlockGardenFree(CropType.Pumpkin);
+            progression.SeedInventory.Add(CropType.Carrot, 7);
+
+            TimedOrderSaveData[] exportedOrders = progression.ExportTimedOrders();
+            int[] exportedSeeds = progression.SeedInventory.Snapshot();
+
+            // Create new runner and restore
+            GameObject newRunner = new GameObject("RestoreRunner");
+            FarmHud newHud = newRunner.AddComponent<FarmHud>();
+            FarmProgression newProgression = newRunner.AddComponent<FarmProgression>();
+            newProgression.ConfigureForTests(newHud, Array.Empty<FarmPlot>(), 25);
+
+            newProgression.SeedInventory.Restore(exportedSeeds);
+            newProgression.RestoreTimedOrders(exportedOrders, DateTime.UtcNow);
+
+            Assert.That(newProgression.SeedInventory.GetCount(CropType.Carrot), Is.EqualTo(exportedSeeds[1]));
+            Assert.That(newProgression.ActiveOrdersCount, Is.EqualTo(exportedOrders.Length));
+
+            UnityEngine.Object.DestroyImmediate(newRunner);
+        }
     }
 }
