@@ -58,6 +58,7 @@ namespace FarmRestoration
             hud.CropInventory.Changed += OnInventoryChanged;
             ready = true;
             Changed?.Invoke();
+            UpdateWorldGardenLabels();
         }
 
         private void OnDestroy()
@@ -181,6 +182,24 @@ namespace FarmRestoration
             }
         }
 
+        public void UpdateWorldGardenLabels()
+        {
+            UpdateGardenSign("PumpkinGarden", CropType.Pumpkin);
+            UpdateGardenSign("CarrotGarden", CropType.Carrot);
+            UpdateGardenSign("TomatoGarden", CropType.Tomato);
+        }
+
+        private void UpdateGardenSign(string gardenName, CropType crop)
+        {
+            GameObject gardenObj = GameObject.Find(gardenName);
+            if (gardenObj == null) return;
+            TextMesh sign = gardenObj.GetComponentInChildren<TextMesh>();
+            if (sign == null) return;
+            bool unlocked = IsGardenUnlocked(crop);
+            string baseName = crop.ToString() + " Garden";
+            sign.text = unlocked ? baseName : $"{baseName} [Locked]";
+        }
+
         public bool TryFeedCow(CowAnimal cow)
         {
             if (!ready || cow == null || !cow.CanFeed) return false;
@@ -289,7 +308,7 @@ namespace FarmRestoration
         private void OnPlotChanged(FarmPlot plot) => SaveGame();
         private void OnCowChanged(CowAnimal cow) { if (!inTransaction) SaveGame(); }
         private void OnInventoryChanged(CropType crop, int count) { if (!inTransaction) { NotifyAndSave(); } }
-        private void NotifyAndSave() { Changed?.Invoke(); SaveGame(); }
+        private void NotifyAndSave() { Changed?.Invoke(); UpdateWorldGardenLabels(); SaveGame(); }
 
         public void SaveGame()
         {

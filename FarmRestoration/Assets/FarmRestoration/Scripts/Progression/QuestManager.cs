@@ -215,6 +215,15 @@ namespace FarmRestoration
             if (!string.IsNullOrEmpty(quest.RewardUnlock))
             {
                 unlockedRewards.Add(quest.RewardUnlock);
+                if (FarmProgression.Instance != null)
+                {
+                    if (quest.RewardUnlock.IndexOf("Pumpkin", StringComparison.OrdinalIgnoreCase) >= 0)
+                        FarmProgression.Instance.UnlockGardenFree(CropType.Pumpkin);
+                    else if (quest.RewardUnlock.IndexOf("Tomato", StringComparison.OrdinalIgnoreCase) >= 0)
+                        FarmProgression.Instance.UnlockGardenFree(CropType.Tomato);
+                    else if (quest.RewardUnlock.IndexOf("Carrot", StringComparison.OrdinalIgnoreCase) >= 0)
+                        FarmProgression.Instance.UnlockGardenFree(CropType.Carrot);
+                }
             }
 
             QuestCompleted?.Invoke(quest);

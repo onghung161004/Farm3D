@@ -106,5 +106,55 @@ namespace FarmRestoration.Tests.EditMode
             Assert.That(triggered, Is.True);
             Assert.That(progression.SeedInventory.GetCount(CropType.Carrot), Is.GreaterThanOrEqualTo(2));
         }
+
+        [Test]
+        public void GardenUnlock_CarrotStartsUnlocked_PumpkinAndTomatoStartLocked()
+        {
+            Assert.That(progression.IsGardenUnlocked(CropType.Carrot), Is.True);
+            Assert.That(progression.IsGardenUnlocked(CropType.Pumpkin), Is.False);
+            Assert.That(progression.IsGardenUnlocked(CropType.Tomato), Is.False);
+        }
+
+        [Test]
+        public void GardenUnlock_UnlockWithCoins_DeductsCoinsAndUnlocks()
+        {
+            progression.AddCoins(50);
+            int startCoins = progression.Coins;
+            int pumpkinCost = progression.GetGardenUnlockCost(CropType.Pumpkin);
+
+            bool unlocked = progression.TryUnlockGarden(CropType.Pumpkin);
+            Assert.That(unlocked, Is.True);
+            Assert.That(progression.IsGardenUnlocked(CropType.Pumpkin), Is.True);
+            Assert.That(progression.Coins, Is.EqualTo(startCoins - pumpkinCost));
+        }
+
+        [Test]
+        public void GardenUnlock_UnlockFree_UnlocksWithoutCoins()
+        {
+            int startCoins = progression.Coins;
+            progression.UnlockGardenFree(CropType.Tomato);
+
+            Assert.That(progression.IsGardenUnlocked(CropType.Tomato), Is.True);
+            Assert.That(progression.Coins, Is.EqualTo(startCoins));
+        }
+
+        [Test]
+        public void GardenUnlock_LockedPlot_PromptShowsLockedAndInteractionBlocks()
+        {
+            GameObject plotObj = new GameObject("PumpkinPlotTest");
+            FarmPlot plot = plotObj.AddComponent<FarmPlot>();
+            plot.ConfigureCropType(CropType.Pumpkin);
+
+            Assert.That(progression.IsGardenUnlocked(CropType.Pumpkin), Is.False);
+            string prompt = plot.GetInteractionPrompt(FarmTool.Hoe);
+            Assert.That(prompt, Does.Contain("[Locked]"));
+
+            // Interacting when player doesn't have enough coins does not till
+            bool interacted = plot.TryInteract(FarmTool.Hoe);
+            Assert.That(interacted, Is.False);
+            Assert.That(plot.CurrentState, Is.EqualTo(FarmPlotState.Untilled));
+
+            UnityEngine.Object.DestroyImmediate(plotObj);
+        }
     }
 }
