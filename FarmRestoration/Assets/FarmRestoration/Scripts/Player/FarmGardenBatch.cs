@@ -6,7 +6,8 @@ namespace FarmRestoration
     /// <summary>Finds one complete 3x3 garden without depending on camera aim.</summary>
     public static class FarmGardenBatch
     {
-        private static readonly string[] GardenNames = { "PumpkinGarden", "CarrotGarden", "TomatoGarden" };
+        private static readonly string[] GardenNames = { "PumpkinGarden", "CarrotGarden", "TomatoGarden",
+            "ExpansionGarden0", "ExpansionGarden1", "ExpansionGarden2" };
 
         public static Transform FindNearest(Vector3 playerPosition, float range)
         {

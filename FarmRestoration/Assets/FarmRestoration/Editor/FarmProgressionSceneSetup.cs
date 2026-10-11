@@ -14,6 +14,9 @@ namespace FarmRestoration.Editor
         private const string ScenePath = "Assets/FarmRestoration/Scenes/FarmDemo.unity";
         private const string RootName = "VillageGameplayV2";
         private const string NpcPrefab = "Assets/Stylized NPC - Peasant Nolant/Prefabs/Peasant Nolant Brown(Free Version).prefab";
+        private const string NpcBluePrefab = "Assets/Stylized NPC - Peasant Nolant/Prefabs/Peasant Nolant Blue(Free Version).prefab";
+        private const string NpcGreenPrefab = "Assets/Stylized NPC - Peasant Nolant/Prefabs/Peasant Nolant Green(Free Version).prefab";
+        private const string NpcYellowPrefab = "Assets/Stylized NPC - Peasant Nolant/Prefabs/Peasant Nolant Yellow(Free Version).prefab";
         private const string CratePrefab = "Assets/Pandazole_Ultimate_Pack/Pandazole Farm Ranch Pack/Prefabs/Prop_WoodenCrates_01.prefab";
         private const string FencePrefab = "Assets/Polytope Studio/Lowpoly_Village/Prefabs/Modular/Fence/PT_Modular_Fence_Wood_01.prefab";
         private const string HousePrefab = "Assets/VillagePack/OldHouse/OldHousePrefab.prefab";
@@ -56,6 +59,17 @@ namespace FarmRestoration.Editor
                 BuildActors(valley.transform);
                 changed = true;
             }
+            Transform gameplay = valley.transform.Find(RootName);
+            if (gameplay != null && gameplay.Find("VillageWarehouse") == null)
+            {
+                CreateWarehouse(gameplay);
+                changed = true;
+            }
+            if (gameplay != null && gameplay.Find("VillageResidentsV1") == null)
+            {
+                CreateResidents(gameplay);
+                changed = true;
+            }
             if (!changed) return;
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -85,6 +99,8 @@ namespace FarmRestoration.Editor
 
             CreateStation(root, "VillageKitchen", -59f, 66f, CropType.Pumpkin, "KITCHEN: SOUP / SAUCE", true);
             CreateStation(root, "VillageJuicePress", -77f, 52f, CropType.Carrot, "PRESS: CARROT JUICE");
+            CreateWarehouse(root);
+            CreateResidents(root);
 
             Transform houseRepair = CreateActor(root, "RepairVillageHouse", -83f, 33f, 1.4f);
             Transform houseGarden = new GameObject("RestoredHouseGarden").transform;
@@ -135,6 +151,57 @@ namespace FarmRestoration.Editor
             station.gameObject.AddComponent<FarmProductionStation>().Configure(crop, 2, tomatoRecipe);
             PlaceDecoration(CratePrefab, station, Vector3.zero, 0.65f);
             Sign(station, label, 2.2f);
+        }
+
+        private static void CreateWarehouse(Transform parent)
+        {
+            Transform warehouse = CreateActor(parent, "VillageWarehouse", -63f, 45f, 1.15f);
+            warehouse.gameObject.AddComponent<VillageWarehouse>();
+            PlaceDecoration(CratePrefab, warehouse, Vector3.zero, 0.75f);
+            Sign(warehouse, "WAREHOUSE  [E]", 2.2f);
+        }
+
+        private static void CreateResidents(Transform parent)
+        {
+            Transform residents = new GameObject("VillageResidentsV1").transform;
+            residents.SetParent(parent, false);
+            CreateResident(residents, "Maya", -74f, 58f, NpcGreenPrefab,
+                "Hello! It is good to see you in the village.",
+                "How are you?", new[] { "I am doing well, thank you!", "The gardens make every day brighter." },
+                "What is new?", new[] { "The well has been busy this morning.", "Everyone is hoping for a good harvest." },
+                new[] { Vector3.zero, new Vector3(-2f, 0f, 1f), new Vector3(-1f, 0f, 3f) });
+            CreateResident(residents, "Bram", -71f, 68f, NpcBluePrefab,
+                "Welcome! Take your time and enjoy the village.",
+                "How is the village?", new[] { "It is quiet, and that suits me.", "Neighbors always lend a hand here." },
+                "Any plans today?", new[] { "I may visit the well later.", "Then I will check on the old houses." },
+                new[] { Vector3.zero, new Vector3(2f, 0f, 0f), new Vector3(1f, 0f, -2f) });
+            CreateResident(residents, "Lina", -72f, 39f, NpcYellowPrefab,
+                "Hi there! Did you cross the bridge safely?",
+                "How are you?", new[] { "Quite well! The fresh air helps.", "I like walking by the village path." },
+                "Tell me about here", new[] { "The bridge brings visitors to us.", "The gardens are just across the river." },
+                new[] { Vector3.zero, new Vector3(-2f, 0f, 1f), new Vector3(-1f, 0f, 3f) });
+        }
+
+        private static void CreateResident(Transform parent, string name, float x, float z, string prefabPath,
+            string greeting, string firstTopic, string[] firstReplies, string secondTopic, string[] secondReplies,
+            Vector3[] stops)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                Debug.LogWarning("Village resident prefab is missing: " + prefabPath);
+                return;
+            }
+            Transform actor = CreateActor(parent, "Resident_" + name, x, z, 0.85f);
+            actor.gameObject.AddComponent<VillageResidentNpc>().Configure(name, greeting, firstTopic, firstReplies,
+                secondTopic, secondReplies);
+            actor.gameObject.AddComponent<VillageTraderRoutine>().ConfigureStops(stops);
+            GameObject visual = (GameObject)PrefabUtility.InstantiatePrefab(prefab, actor);
+            visual.name = "ResidentVisual";
+            visual.transform.localPosition = Vector3.zero;
+            visual.transform.localScale = Vector3.one * 1.5f;
+            foreach (Collider collider in visual.GetComponentsInChildren<Collider>(true)) collider.enabled = false;
+            PolytopeNatureSetup.ConvertPackMaterials(visual.transform);
         }
 
         private static void PlaceDecoration(string path, Transform parent, Vector3 position, float scale)

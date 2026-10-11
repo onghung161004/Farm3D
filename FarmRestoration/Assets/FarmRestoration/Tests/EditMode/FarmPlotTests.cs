@@ -58,6 +58,38 @@ namespace FarmRestoration.Tests.EditMode
         }
 
         [Test]
+        public void TryPlant_UsesChosenCropOnlyAfterTilling()
+        {
+            Assert.That(plot.TryPlant(CropType.Tomato), Is.False);
+            Assert.That(plot.TryInteract(FarmTool.Hoe), Is.True);
+            Assert.That(plot.TryPlant(CropType.Tomato), Is.True);
+            Assert.That(plot.CropType, Is.EqualTo(CropType.Tomato));
+            Assert.That(plot.CurrentState, Is.EqualTo(FarmPlotState.Seeded));
+            Assert.That(plot.TryPlant(CropType.Carrot), Is.False);
+            Assert.That(plot.CropType, Is.EqualTo(CropType.Tomato));
+        }
+
+        [Test]
+        public void LockedExpansionPlot_RejectsAllFarmingActions()
+        {
+            GameObject garden = new GameObject("ExpansionGarden0");
+            try
+            {
+                plotObject.transform.SetParent(garden.transform);
+                plot.ConfigureRequiredGarden(0);
+                Assert.That(plot.IsUnlocked, Is.False);
+                Assert.That(plot.TryInteract(FarmTool.Hoe), Is.False);
+                Assert.That(plot.CurrentState, Is.EqualTo(FarmPlotState.Untilled));
+                Assert.That(plot.GetInteractionPrompt(FarmTool.Hoe), Does.Contain("30 coins"));
+            }
+            finally
+            {
+                plotObject.transform.SetParent(null);
+                UnityEngine.Object.DestroyImmediate(garden);
+            }
+        }
+
+        [Test]
         public void FullFarmingLoop_HarvestsExactlyOneCropAndResetsPlot()
         {
             int harvestEvents = 0;
@@ -106,6 +138,54 @@ namespace FarmRestoration.Tests.EditMode
 
             Assert.That(plot.CurrentState, Is.EqualTo(FarmPlotState.ReadyToHarvest));
             AssertOnlyVisualIsActive(5);
+        }
+
+        [Test]
+        public void RainOnSeededPlot_StartsGrowthAndNotifiesOnce()
+        {
+            plot.TryInteract(FarmTool.Hoe);
+            plot.TryInteract(FarmTool.Seeds);
+            int changes = 0;
+            plot.StateChanged += _ => changes++;
+            DateTime now = new DateTime(2026, 10, 9, 8, 0, 0, DateTimeKind.Utc);
+
+            Assert.That(plot.TryWaterFromRain(now), Is.True);
+            Assert.That(plot.CurrentState, Is.EqualTo(FarmPlotState.Watered));
+            Assert.That(plot.GrowthReadyUtcTicks, Is.EqualTo(now.AddSeconds(75).Ticks));
+            Assert.That(plot.TryWaterFromRain(now.AddSeconds(5)), Is.False);
+            Assert.That(changes, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void RainOnNonSeededPlot_DoesNotModifyStateOrDeadline()
+        {
+            DateTime now = DateTime.UtcNow;
+            Assert.That(plot.TryWaterFromRain(now), Is.False);
+            plot.TryInteract(FarmTool.Hoe);
+            Assert.That(plot.TryWaterFromRain(now), Is.False);
+            plot.TryInteract(FarmTool.Seeds);
+            plot.TryInteract(FarmTool.WateringCan);
+            long deadline = plot.GrowthReadyUtcTicks;
+            Assert.That(plot.TryWaterFromRain(now), Is.False);
+            Assert.That(plot.GrowthReadyUtcTicks, Is.EqualTo(deadline));
+        }
+
+        [TestCase(CropType.Pumpkin, 75)]
+        [TestCase(CropType.Carrot, 45)]
+        [TestCase(CropType.Tomato, 60)]
+        public void RainWatering_KeepsCropSpecificGrowthTime(CropType type, int seconds)
+        {
+            plot.ConfigureCropType(type);
+            plot.TryInteract(FarmTool.Hoe);
+            plot.TryInteract(FarmTool.Seeds);
+            DateTime now = new DateTime(2026, 10, 9, 8, 0, 0, DateTimeKind.Utc);
+
+            Assert.That(plot.TryWaterFromRain(now), Is.True);
+            Assert.That(plot.GrowthReadyUtcTicks, Is.EqualTo(now.AddSeconds(seconds).Ticks));
+
+            plot.Restore(FarmPlotState.Watered, plot.GrowthReadyUtcTicks, now.AddSeconds(1));
+            Assert.That(plot.CurrentState, Is.EqualTo(FarmPlotState.Watered));
+            Assert.That(plot.GrowthReadyUtcTicks, Is.EqualTo(now.AddSeconds(seconds).Ticks));
         }
 
         [Test]

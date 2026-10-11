@@ -80,6 +80,7 @@ namespace FarmRestoration.Editor
             FarmDayNightSetup.Install(scene);
             if (PolytopeNatureSetup.HasPack()) PolytopeNatureSetup.ApplyToRoot(root);
             if (PolytopeNatureSetup.HasPack()) CoherentFarmsteadSetup.ApplyToScene(scene);
+            FishingPondSetup.Build(scene);
 
             EditorUtility.SetDirty(root.gameObject);
             EditorSceneManager.MarkSceneDirty(scene);
@@ -144,6 +145,12 @@ namespace FarmRestoration.Editor
         }
 
         private static float HeightAt(float x, float z)
+        {
+            float height = VillageHouseLayout.LevelHouseGround(x, z, NaturalHeightAt);
+            return FishingPondSetup.HasWaterMaterial ? FishingPondTerrain.Height(x, z, height) : height;
+        }
+
+        private static float NaturalHeightAt(float x, float z)
         {
             float distanceFromFarm = new Vector2(x, z).magnitude;
             float outskirts = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(27f, 42f, distanceFromFarm));
@@ -210,7 +217,88 @@ namespace FarmRestoration.Editor
         {
             List<Vector3> river = SampleCurve(RiverNodes, 8);
             CreateWaterSurface(root, river, water);
-            CreateRibbon(root, "RiverShore", river, 6.6f, -1.12f, bank, false);
+            GameObject shore = new GameObject("RiverShore", typeof(MeshFilter), typeof(MeshRenderer));
+            shore.transform.SetParent(root, false);
+            shore.GetComponent<MeshFilter>().sharedMesh = GetMesh("IllustratedRiverShore");
+            shore.GetComponent<MeshRenderer>().sharedMaterial = bank;
+            RefreshRiverShore(root, true);
+        }
+
+        // The old shore was a flat ribbon at Y=-1.12. Rebuild its two visible edges
+        // against the actual terrain mesh so the bank cannot float above a hillside.
+        internal static bool RefreshRiverShore(Transform root, bool force = false)
+        {
+            MeshFilter shore = root.Find("RiverShore")?.GetComponent<MeshFilter>();
+            MeshFilter water = root.Find("RiverWater")?.GetComponent<MeshFilter>();
+            MeshCollider terrain = root.Find("WalkableValleyTerrain")?.GetComponent<MeshCollider>();
+            if (shore == null || shore.sharedMesh == null || water == null || water.sharedMesh == null || terrain == null)
+                return false;
+
+            List<Vector3> curve = SampleCurve(RiverNodes, 8);
+            const int waterColumns = 9;
+            Mesh waterMesh = water.sharedMesh;
+            if (waterMesh.vertexCount != curve.Count * waterColumns)
+            {
+                Debug.LogWarning("River shore was not refreshed because the water mesh layout has changed.", water.gameObject);
+                return false;
+            }
+            Mesh shoreMesh = shore.sharedMesh;
+            if (!force && shoreMesh.vertexCount == curve.Count * 4) return false;
+
+            Vector3[] waterVertices = waterMesh.vertices;
+            Vector3[] vertices = new Vector3[curve.Count * 4];
+            Vector2[] uv = new Vector2[vertices.Length];
+            int[] triangles = new int[(curve.Count - 1) * 12];
+            for (int i = 0; i < curve.Count; i++)
+            {
+                Vector3 before = curve[Mathf.Max(0, i - 1)];
+                Vector3 after = curve[Mathf.Min(curve.Count - 1, i + 1)];
+                Vector3 tangent = (after - before).normalized;
+                Vector3 side = new Vector3(-tangent.z, 0f, tangent.x);
+
+                Vector3 leftOuter = curve[i] - side * 6.6f;
+                Vector3 rightOuter = curve[i] + side * 6.6f;
+                leftOuter.y = ShoreTerrainHeight(terrain, leftOuter) + 0.025f;
+                rightOuter.y = ShoreTerrainHeight(terrain, rightOuter) + 0.025f;
+                Vector3 leftInner = waterVertices[i * waterColumns];
+                Vector3 rightInner = waterVertices[i * waterColumns + waterColumns - 1];
+                leftInner.y += 0.015f;
+                rightInner.y += 0.015f;
+                int row = i * 4;
+                vertices[row] = leftOuter;
+                vertices[row + 1] = leftInner;
+                vertices[row + 2] = rightInner;
+                vertices[row + 3] = rightOuter;
+                float along = i / 5f;
+                for (int column = 0; column < 4; column++) uv[row + column] = new Vector2(column % 2, along);
+                if (i == curve.Count - 1) continue;
+                int triangle = i * 12;
+                for (int sideIndex = 0; sideIndex < 2; sideIndex++)
+                {
+                    int a = row + sideIndex * 2;
+                    int b = a + 1;
+                    int c = a + 4;
+                    int d = c + 1;
+                    int start = triangle + sideIndex * 6;
+                    triangles[start] = a; triangles[start + 1] = b; triangles[start + 2] = c;
+                    triangles[start + 3] = b; triangles[start + 4] = d; triangles[start + 5] = c;
+                }
+            }
+            shoreMesh.Clear();
+            shoreMesh.vertices = vertices;
+            shoreMesh.uv = uv;
+            shoreMesh.triangles = triangles;
+            shoreMesh.RecalculateNormals();
+            shoreMesh.RecalculateBounds();
+            EditorUtility.SetDirty(shoreMesh);
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+            return true;
+        }
+
+        private static float ShoreTerrainHeight(MeshCollider terrain, Vector3 point)
+        {
+            Ray ray = new Ray(new Vector3(point.x, 100f, point.z), Vector3.down);
+            return terrain.Raycast(ray, out RaycastHit hit, 200f) ? hit.point.y : HeightAt(point.x, point.z);
         }
 
         [MenuItem("Tools/Farm Restoration/Replace River With Imported 3D Water")]
@@ -229,16 +317,17 @@ namespace FarmRestoration.Editor
                 EditorUtility.DisplayDialog("Valley map missing", "Build the Illustrated 3D Valley Map first.", "OK");
                 return;
             }
-            if (!RepairRiverTerrain(rootObject.transform)) return;
+            if (!RefreshTerrainHeights(rootObject.transform)) return;
             Transform oldWater = rootObject.transform.Find("RiverWater");
             if (oldWater != null) Object.DestroyImmediate(oldWater.gameObject);
             CreateWaterSurface(rootObject.transform, SampleCurve(RiverNodes, 8), GetWaterMaterial(lit));
+            RefreshRiverShore(rootObject.transform, true);
             EditorSceneManager.MarkSceneDirty(scene);
             AssetDatabase.SaveAssets();
             Debug.Log("Repaired the riverbed and rebuilt the optimized 3D water surface. Save FarmDemo with Ctrl+S.", rootObject);
         }
 
-        private static bool RepairRiverTerrain(Transform root)
+        internal static bool RefreshTerrainHeights(Transform root)
         {
             Transform ground = root.Find("WalkableValleyTerrain");
             MeshFilter filter = ground == null ? null : ground.GetComponent<MeshFilter>();
@@ -246,10 +335,10 @@ namespace FarmRestoration.Editor
             Mesh mesh = filter == null ? null : filter.sharedMesh;
             if (mesh == null || collider == null)
             {
-                Debug.LogError("River repair stopped: the generated terrain mesh or collider is missing.", root);
+                Debug.LogError("Terrain refresh stopped: the generated terrain mesh or collider is missing.", root);
                 return false;
             }
-            Undo.RecordObject(mesh, "Repair river channel");
+            Undo.RecordObject(mesh, "Refresh valley terrain heights");
             Vector3[] vertices = mesh.vertices;
             for (int i = 0; i < vertices.Length; i++)
                 vertices[i].y = HeightAt(vertices[i].x, vertices[i].z);
@@ -259,11 +348,15 @@ namespace FarmRestoration.Editor
             collider.sharedMesh = null;
             collider.sharedMesh = mesh;
             EditorUtility.SetDirty(mesh);
+            RefreshRiverShore(root, true);
             return true;
         }
 
         private static Material GetWaterMaterial(Shader lit)
         {
+            Material importedWater = AssetDatabase.LoadAssetAtPath<Material>(
+                "Assets/BluBlu Games/Low Poly Forest Mini Pack/Materials/Water.mat");
+            if (importedWater != null) return importedWater;
             ConfigureWaterTexture(ImportedWaterTexture, false, 512);
             Material material = GetMaterial("ValleyRiver", lit, new Color(0.66f, 0.85f, 0.95f), null, Vector2.one);
             Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(ImportedWaterTexture);
@@ -459,7 +552,9 @@ namespace FarmRestoration.Editor
                 float x = Random.Range(-94f, 94f);
                 float z = Random.Range(-90f, 94f);
                 bool forestZone = x < -57f || x > 52f || z > 72f;
-                if (!forestZone || DistanceToRiver(new Vector2(x, z)) < 10f || new Vector2(x, z).magnitude < 32f) continue;
+                if (!forestZone || DistanceToRiver(new Vector2(x, z)) < 10f
+                    || VillageHouseLayout.IsNearHome(new Vector2(x, z), 8f)
+                    || new Vector2(x, z).magnitude < 32f) continue;
                 string prefabName = "Env_Tree_0" + (1 + (i % 7));
                 GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(RanchPrefabs + prefabName + ".prefab");
                 if (prefab == null) continue;

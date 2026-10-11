@@ -46,8 +46,14 @@ Khi bổ sung một file lớn mới, dùng `git lfs track "đường/dẫn/file
 | `E` | Tương tác với ô đất hoặc đối tượng ở gần |
 | Giữ `E` gần một vườn | Lần lượt thao tác trên tối đa 9 ô đất bằng công cụ đang chọn |
 | `R` | Đổi công thức ở trạm chế biến có nhiều công thức |
+| `Enter` / `Esc` | Xác nhận giao đơn trong hội thoại NPC / đóng hội thoại hoặc kho |
 
 Vòng chơi: **cuốc đất → gieo hạt → tưới nước → chờ cây lớn → thu hoạch → chế biến hoặc giao đơn → nhận tiền → sửa chữa làng**. Thời gian trồng hiện tại là 45 giây cho cà rốt, 60 giây cho cà chua và 75 giây cho bí ngô. Tiến trình được lưu dưới dạng `FarmDemoSave.json` trong `Application.persistentDataPath` của Unity, không lưu trong repository.
+
+Ở làng, bấm `E` gần thương nhân để xem đơn; chọn **Deliver** hoặc nhấn `Enter` mới giao hàng. Bấm `E` gần thùng **WAREHOUSE** để xem chung lượng bí ngô, cà rốt, cà chua, sản phẩm chế biến và sữa; chọn một món rồi bấm **Sell 1** để bán một đơn vị. Bán trực tiếp có giá thấp hơn giao đơn; kho không có bước gửi/rút, mọi thao tác dùng cùng số lượng đã lưu trong game.
+
+Làng có ba cư dân đi dạo ngoài thương nhân. Đến gần Maya, Bram hoặc Lina và bấm `E` để chào hỏi; chọn một trong hai chủ đề rồi bấm **Next**/`Enter` để đọc tiếp, `Esc` để đóng. Hội thoại này không giao dịch hay thay đổi kho/tiền.
+Nếu scene đang mở trước khi cập nhật mã, hãy mở lại `FarmDemo.unity` để Unity tạo bố cục 7 nhà gỗ và 3 cư dân. Có thể chạy thủ công `Tools > Farm Restoration > Build Village With Village Houses Pack` và `Add Village Progression Gameplay` rồi lưu scene.
 
 ## Cấu trúc chính
 

@@ -7,15 +7,21 @@ namespace FarmRestoration
     {
         public bool TryInteract(FarmTool tool)
         {
-            FarmProgression game = FarmProgression.Instance;
-            return game != null && game.TryDeliverOrder();
+            if (FarmProgression.Instance == null) return false;
+            return VillageOrderDialogue.Show(this);
         }
 
         public string GetInteractionPrompt(FarmTool tool)
         {
             FarmProgression game = FarmProgression.Instance;
             return game == null ? "Orders are loading"
-                : "Village order: " + game.OrderDescription() + " -> " + game.OrderReward + " coins  [E deliver]";
+                : "Village order: " + game.OrderDescription() + " -> " + game.OrderReward + " coins  [E talk]";
+        }
+
+        private void Awake()
+        {
+            if (GetComponent<VillageTraderRoutine>() == null)
+                gameObject.AddComponent<VillageTraderRoutine>();
         }
     }
 }

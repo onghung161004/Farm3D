@@ -17,10 +17,28 @@ namespace FarmRestoration
 
         private static readonly Dictionary<Material, Material> UrpMaterials = new Dictionary<Material, Material>();
         private readonly List<GameObject> createdModels = new List<GameObject>(7);
+        private FarmPlot plot;
 
         private void Awake()
         {
-            FarmPlot plot = GetComponent<FarmPlot>();
+            plot = GetComponent<FarmPlot>();
+            plot.CropTypeChanged += OnCropTypeChanged;
+            BuildModels();
+        }
+
+        private void OnDestroy()
+        {
+            if (plot != null) plot.CropTypeChanged -= OnCropTypeChanged;
+        }
+
+        private void OnCropTypeChanged(CropType type)
+        {
+            DiscardCreatedModels();
+            BuildModels();
+        }
+
+        private void BuildModels()
+        {
             GameObject plant;
             GameObject fruit;
             switch (plot.CropType)
@@ -116,7 +134,8 @@ namespace FarmRestoration
 
         private void DiscardCreatedModels()
         {
-            foreach (GameObject model in createdModels) if (model != null) Destroy(model);
+            foreach (GameObject model in createdModels)
+                if (model != null) { model.SetActive(false); Destroy(model); }
             createdModels.Clear();
         }
 

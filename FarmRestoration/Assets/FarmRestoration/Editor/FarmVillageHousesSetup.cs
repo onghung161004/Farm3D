@@ -14,7 +14,7 @@ namespace FarmRestoration.Editor
         private const string WellPath = "Assets/VillagePack/Well/Well.prefab";
         private const string FencePath = "Assets/VillagePack/Fence/FencePrefab.prefab";
         private const string VillageRootName = "UniformWoodenHamlet";
-        private const string SpacingMarker = "VillageSpacingV2";
+        private const string SpacingMarker = "VillageLevelGroundV4";
 
         [InitializeOnLoadMethod]
         private static void ScheduleExistingVillageUpgrade()
@@ -36,10 +36,13 @@ namespace FarmRestoration.Editor
             if (host == null || host.Find(VillageRootName + "/" + SpacingMarker) != null
                 || !TryLoadPrefabs(out Prefabs prefabs)) return;
             if (Shader.Find("Universal Render Pipeline/Lit") == null) return;
-            RebuildUnder(host, ReferenceLandscapeSetup.GroundHeightAt,
+            if (!ReferenceLandscapeSetup.RefreshTerrainHeights(landscape)) return;
+            Transform village = RebuildUnder(host, ReferenceLandscapeSetup.GroundHeightAt,
                 Shader.Find("Universal Render Pipeline/Lit"), prefabs);
+            if (village == null) return;
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
         }
 
         [MenuItem("Tools/Farm Restoration/Build Village With Village Houses Pack")]
@@ -53,7 +56,7 @@ namespace FarmRestoration.Editor
             }
 
             Shader lit = Shader.Find("Universal Render Pipeline/Lit");
-            if (lit == null || !TryLoadPrefabs(out Prefabs prefabs))
+            if (lit == null || !TryLoadPrefabs(out Prefabs prefabs) || !VillageHouseLayout.Validate(VillageHouseLayout.Homes))
             {
                 EditorUtility.DisplayDialog("Village Houses Pack unavailable", "The VillagePack prefabs or URP Lit shader are missing. Wait for import to finish, then retry.", "OK");
                 return;
@@ -67,7 +70,9 @@ namespace FarmRestoration.Editor
             }
 
             Transform villageHost = FindOrCreateChild(landscape, "RiversideVillage");
+            if (!ReferenceLandscapeSetup.RefreshTerrainHeights(landscape)) return;
             Transform village = RebuildUnder(villageHost, ReferenceLandscapeSetup.GroundHeightAt, lit, prefabs);
+            if (village == null) return;
             EditorSceneManager.MarkSceneDirty(scene);
             AssetDatabase.SaveAssets();
             EditorSceneManager.SaveScene(scene);
@@ -83,33 +88,60 @@ namespace FarmRestoration.Editor
 
         private static Transform RebuildUnder(Transform host, Func<float, float, float> heightAt, Shader lit, Prefabs prefabs)
         {
+            if (!VillageHouseLayout.Validate(VillageHouseLayout.Homes))
+            {
+                Debug.LogError("Village layout has overlapping or obstructing house slots; existing village was kept.");
+                return null;
+            }
             RemoveChild(host, "VillageHousesPackVillage");
             RemoveChild(host, VillageRootName);
             RemoveChild(host, "VillageBarn");
             Transform windmill = host.Find("HillWindmill");
             if (windmill != null)
-                windmill.position = new Vector3(-88f, heightAt(-88f, 78f), 78f);
+                windmill.position = new Vector3(-80f, heightAt(-80f, 12f), 12f);
             Transform village = new GameObject(VillageRootName).transform;
             village.SetParent(host, false);
 
-            // Three homes share one mesh and occupy separate clearings around the well.
-            Place(prefabs.oldHouse, village, "WoodenHouseWest", new Vector3(-80f, 0f, 63f), 0.82f, 125f, heightAt);
-            Place(prefabs.oldHouse, village, "WoodenHouseNorth", new Vector3(-60f, 0f, 74f), 0.82f, 180f, heightAt);
-            Place(prefabs.oldHouse, village, "WoodenHouseSouth", new Vector3(-80f, 0f, 38f), 0.82f, 55f, heightAt);
+            foreach (VillageHouseSlot slot in VillageHouseLayout.Homes)
+                Place(prefabs.oldHouse, village, slot.Name,
+                    new Vector3(slot.Position.x, 0f, slot.Position.y), slot.Scale, slot.RotationY, heightAt);
             Place(prefabs.well, village, "VillageWell", new Vector3(-63f, 0f, 50.5f), 0.95f, 0f, heightAt);
 
             if (!PolytopeNatureSetup.HasPack())
             {
-                CreateFenceArc(prefabs.fence, village, new Vector3(-77f, 0f, 50f), 5, true, heightAt);
-                CreateFenceArc(prefabs.fence, village, new Vector3(-49f, 0f, 50f), 5, true, heightAt);
-                CreateFenceArc(prefabs.fence, village, new Vector3(-63f, 0f, 62f), 5, false, heightAt);
+                CreateFenceArc(prefabs.fence, village, new Vector3(-97f, 0f, 60f), 5, true, heightAt);
+                CreateFenceArc(prefabs.fence, village, new Vector3(-38f, 0f, 70f), 5, true, heightAt);
+                CreateFenceArc(prefabs.fence, village, new Vector3(-65f, 0f, 94f), 5, false, heightAt);
             }
 
             ReplaceOldFarmhouse(village, prefabs.oldHouse, heightAt);
+            Transform southHouse = village.Find("WoodenHouseSouth");
+            foreach (VillageRepairPoint repair in UnityEngine.Object.FindObjectsByType<VillageRepairPoint>(FindObjectsSortMode.None))
+                repair.RebindHouseVisual(southHouse == null ? null : southHouse.gameObject);
             LiteFarmPackUrpMaterialFix.ConvertMaterialsUnder(village, lit, "ConvertedVillageHouses");
             new GameObject(SpacingMarker).transform.SetParent(village, false);
             PolytopeNatureSetup.RefreshVillageFences(host.parent);
+            ClearGeneratedOverlap(host.parent);
             return village;
+        }
+
+        private static void ClearGeneratedOverlap(Transform valley)
+        {
+            if (valley == null) return;
+            string[] paths =
+            {
+                "ValleyForests", "ValleyBoulders", "PolytopeNatureEnvironment/Trees",
+                "PolytopeNatureEnvironment/MeadowAndRiverbank"
+            };
+            foreach (string path in paths)
+            {
+                Transform group = valley.Find(path);
+                if (group == null) continue;
+                float clearance = path.Contains("Trees") || path == "ValleyForests" ? 8f : 5f;
+                foreach (Transform item in group)
+                    if (VillageHouseLayout.IsNearHome(new Vector2(item.position.x, item.position.z), clearance))
+                        item.gameObject.SetActive(false);
+            }
         }
 
         private static void ReplaceOldFarmhouse(Transform village, GameObject house, Func<float, float, float> heightAt)
