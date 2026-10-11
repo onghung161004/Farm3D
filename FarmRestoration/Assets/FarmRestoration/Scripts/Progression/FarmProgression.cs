@@ -18,6 +18,7 @@ namespace FarmRestoration
         private int coins;
         private int orderIndex;
         private int milk;
+        private int fish;
         private bool ready;
         private bool inTransaction;
 
@@ -25,6 +26,7 @@ namespace FarmRestoration
         public int Coins => coins;
         public int OrderIndex => orderIndex;
         public int MilkCount => milk;
+        public int FishCount => fish;
         public int CarrotCount => hud == null ? 0 : hud.CropInventory.GetCount(CropType.Carrot);
         private int OrderCycleLength => cows.Length > 0 || milk > 0 ? 7 : 6;
         public event Action Changed;
@@ -67,10 +69,10 @@ namespace FarmRestoration
         public int StockCount(WarehouseItemKind item)
         {
             int index = (int)item;
-            if (index < 0 || index > 6) return 0;
+            if (index < 0 || index > 7) return 0;
             if (index < 3) return hud == null ? 0 : hud.CropInventory.GetCount((CropType)index);
             if (index < 6) return products[index - 3];
-            return milk;
+            return index == 6 ? milk : fish;
         }
 
         public static int SellPrice(WarehouseItemKind item)
@@ -78,7 +80,7 @@ namespace FarmRestoration
             int index = (int)item;
             if (index >= 0 && index < 3) return 2;
             if (index >= 3 && index < 6) return 15;
-            return index == 6 ? 10 : 0;
+            return index == 6 ? 10 : index == 7 ? 8 : 0;
         }
 
         public bool TrySell(WarehouseItemKind item)
@@ -94,7 +96,8 @@ namespace FarmRestoration
                 if (!spent) return false;
             }
             else if (index < 6) products[index - 3]--;
-            else milk--;
+            else if (index == 6) milk--;
+            else fish--;
             coins += price;
             NotifyAndSave();
             return true;
@@ -131,6 +134,14 @@ namespace FarmRestoration
             inTransaction = false;
             if (!collected) return false;
             milk++;
+            NotifyAndSave();
+            return true;
+        }
+
+        public bool AddFish()
+        {
+            if (!ready || fish == int.MaxValue) return false;
+            fish++;
             NotifyAndSave();
             return true;
         }
@@ -230,6 +241,7 @@ namespace FarmRestoration
                 coins = coins,
                 orderIndex = orderIndex,
                 milk = milk,
+                fish = fish,
                 repairs = (bool[])repairs.Clone(),
                 gardenUnlocks = (bool[])gardenUnlocks.Clone(),
                 plots = new PlotSaveData[plots.Length],
@@ -262,7 +274,7 @@ namespace FarmRestoration
             try
             {
                 FarmSaveData data = JsonUtility.FromJson<FarmSaveData>(File.ReadAllText(SavePath));
-                if (data == null || (data.version != 1 && data.version != 2 && data.version != 3)) throw new InvalidDataException("Unsupported save version");
+                if (data == null || (data.version < 1 || data.version > 4)) throw new InvalidDataException("Unsupported save version");
                 hud.CropInventory.Restore(data.crops);
                 for (int i = 0; i < products.Length; i++) products[i] = data.products != null && i < data.products.Length ? Math.Max(0, data.products[i]) : 0;
                 for (int i = 0; i < repairs.Length; i++) repairs[i] = data.repairs != null && i < data.repairs.Length && data.repairs[i];
@@ -271,6 +283,7 @@ namespace FarmRestoration
                 coins = Math.Max(0, data.coins);
                 orderIndex = Math.Max(0, data.orderIndex);
                 milk = Math.Max(0, data.milk);
+                fish = Math.Max(0, data.fish);
                 Dictionary<string, PlotSaveData> savedPlots = new Dictionary<string, PlotSaveData>();
                 if (data.plots != null)
                     foreach (PlotSaveData saved in data.plots)
@@ -299,6 +312,7 @@ namespace FarmRestoration
                 coins = 0;
                 orderIndex = 0;
                 milk = 0;
+                fish = 0;
                 foreach (FarmPlot plot in plots) plot.Restore(FarmPlotState.Untilled, 0, DateTime.UtcNow);
                 hud.RefreshInventory();
             }

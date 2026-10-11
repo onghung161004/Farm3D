@@ -16,8 +16,21 @@ namespace FarmRestoration
         private CharacterController characterController;
         private float verticalVelocity;
         private Vector3 planarVelocity;
+        private Vector2 mobileInput;
 
         public bool IsMoving { get; private set; }
+        public bool ControlsLocked { get; private set; }
+
+        public void SetControlsLocked(bool locked)
+        {
+            ControlsLocked = locked;
+            if (locked) { planarVelocity = Vector3.zero; IsMoving = false; }
+        }
+
+        public void SetMobileInput(Vector2 input)
+        {
+            mobileInput = Vector2.ClampMagnitude(input, 1f);
+        }
 
         private void Awake()
         {
@@ -31,7 +44,8 @@ namespace FarmRestoration
 
         private void Update()
         {
-            Vector2 input = PlayerMovementMath.NormalizePlanarInput(ReadKeyboardInput());
+            Vector2 input = ControlsLocked ? Vector2.zero : PlayerMovementMath.NormalizePlanarInput(
+                ReadKeyboardInput() + mobileInput);
             Vector3 movement = GetCameraRelativeMovement(input);
             Vector3 targetVelocity = movement * moveSpeed;
             float speedChange = movement.sqrMagnitude > 0.0001f ? acceleration : deceleration;

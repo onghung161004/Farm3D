@@ -17,6 +17,7 @@ namespace FarmRestoration.Editor
         private const string FencePath = "Assets/Polytope Studio/Lowpoly_Village/Prefabs/Modular/Fence/PT_Modular_Fence_Wood_01.prefab";
         private const string RanchPath = "Assets/Pandazole_Ultimate_Pack/Pandazole Farm Ranch Pack/Prefabs/";
         private const float CowHeight = 3.2f;
+        private static readonly Vector2 ExpandedPenSize = new Vector2(8f, 18f);
         private static readonly Vector2[] CowSpawns =
         {
             new Vector2(-12f, -20f), new Vector2(6f, -24f), new Vector2(24f, -13f),
@@ -28,6 +29,10 @@ namespace FarmRestoration.Editor
         {
             EditorApplication.delayCall += AutoInstall;
             EditorSceneManager.sceneOpened += (scene, mode) => EditorApplication.delayCall += AutoInstall;
+            EditorApplication.playModeStateChanged += state =>
+            {
+                if (state == PlayModeStateChange.EnteredEditMode) EditorApplication.delayCall += AutoInstall;
+            };
         }
 
         private static void AutoInstall()
@@ -106,6 +111,27 @@ namespace FarmRestoration.Editor
             if (herd == null) return false;
 
             bool changed = false;
+            CowPen pen = herd.Find("DairyPen")?.GetComponent<CowPen>();
+            if (pen != null && NeedsPenUpgrade(pen))
+            {
+                GameObject fence = AssetDatabase.LoadAssetAtPath<GameObject>(FencePath);
+                if (fence != null)
+                {
+                    Undo.RecordObject(pen.transform, "Expand dairy pen toward gate");
+                    Undo.RecordObject(pen, "Expand dairy pen capacity");
+                    pen.transform.position = OnGround(-24f, 9f);
+                    pen.Configure(ExpandedPenSize);
+                    for (int i = pen.transform.childCount - 1; i >= 0; i--)
+                    {
+                        Transform child = pen.transform.GetChild(i);
+                        if (child.name.StartsWith("CowPenFence_")) Undo.DestroyObjectImmediate(child.gameObject);
+                    }
+                    BuildPenFences(pen.transform, fence);
+                    PolytopeNatureSetup.ConvertPackMaterials(pen.transform);
+                    changed = true;
+                }
+                else Debug.LogWarning("Dairy pen expansion needs its wood fence prefab; existing pen was left untouched.");
+            }
             Transform shelter = herd.Find("DairyShelter");
             if (shelter != null)
             {
@@ -148,6 +174,16 @@ namespace FarmRestoration.Editor
             Bounds bounds = renderers[0].bounds;
             for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
             return bounds;
+        }
+
+        private static bool NeedsPenUpgrade(CowPen pen)
+        {
+            if (pen.Footprint != ExpandedPenSize || Vector3.Distance(pen.transform.position, OnGround(-24f, 9f)) > 0.05f)
+                return true;
+            int fenceCount = 0;
+            foreach (Transform child in pen.transform)
+                if (child.name.StartsWith("CowPenFence_")) fenceCount++;
+            return fenceCount != 24;
         }
 
         private static Material EnsureCowMaterial(Shader shader)
@@ -219,18 +255,23 @@ namespace FarmRestoration.Editor
 
         private static CowPen CreatePen(Transform root, GameObject fence)
         {
-            Vector3 center = OnGround(-24f, 12f);
+            Vector3 center = OnGround(-24f, 9f);
             GameObject penObject = new GameObject("DairyPen");
             penObject.transform.SetParent(root);
             penObject.transform.position = center;
             CowPen pen = penObject.AddComponent<CowPen>();
-            pen.Configure(new Vector2(8f, 12f));
-            FenceSide(fence, penObject.transform, new Vector2(-28f, 18f), new Vector2(-20f, 18f), 4);
-            FenceSide(fence, penObject.transform, new Vector2(-28f, 6f), new Vector2(-25.5f, 6f), 1);
-            FenceSide(fence, penObject.transform, new Vector2(-22.5f, 6f), new Vector2(-20f, 6f), 1);
-            FenceSide(fence, penObject.transform, new Vector2(-28f, 6f), new Vector2(-28f, 18f), 6);
-            FenceSide(fence, penObject.transform, new Vector2(-20f, 6f), new Vector2(-20f, 18f), 6);
+            pen.Configure(ExpandedPenSize);
+            BuildPenFences(penObject.transform, fence);
             return pen;
+        }
+
+        private static void BuildPenFences(Transform pen, GameObject fence)
+        {
+            FenceSide(fence, pen, new Vector2(-28f, 18f), new Vector2(-20f, 18f), 4);
+            FenceSide(fence, pen, new Vector2(-28f, 0f), new Vector2(-25.5f, 0f), 1);
+            FenceSide(fence, pen, new Vector2(-22.5f, 0f), new Vector2(-20f, 0f), 1);
+            FenceSide(fence, pen, new Vector2(-28f, 0f), new Vector2(-28f, 18f), 9);
+            FenceSide(fence, pen, new Vector2(-20f, 0f), new Vector2(-20f, 18f), 9);
         }
 
         private static void FenceSide(GameObject prefab, Transform parent, Vector2 a, Vector2 b, int count)

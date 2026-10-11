@@ -104,11 +104,7 @@ namespace FarmRestoration
 
             if (mouse.rightButton.isPressed)
             {
-                Vector2 delta = mouse.delta.ReadValue();
-                yaw += delta.x * orbitSensitivity;
-                float lowerPitch = Mathf.Clamp(minimumPitch, 1f, 80f);
-                float upperPitch = Mathf.Clamp(Mathf.Max(maximumPitch, lowerPitch), lowerPitch, 89f);
-                pitch = Mathf.Clamp(pitch - delta.y * orbitSensitivity, lowerPitch, upperPitch);
+                AddOrbitDelta(mouse.delta.ReadValue());
             }
 
             float scroll = mouse.scroll.ReadValue().y;
@@ -117,6 +113,15 @@ namespace FarmRestoration
                 float nearest = Mathf.Max(1f, minimumDistance);
                 distance = Mathf.Clamp(distance - scroll * zoomSensitivity, nearest, Mathf.Max(maximumDistance, nearest));
             }
+        }
+
+        public void AddOrbitDelta(Vector2 delta)
+        {
+            if (!orbitInitialized) InitializeOrbit();
+            yaw += delta.x * orbitSensitivity;
+            float lowerPitch = Mathf.Clamp(minimumPitch, 1f, 80f);
+            float upperPitch = Mathf.Clamp(Mathf.Max(maximumPitch, lowerPitch), lowerPitch, 89f);
+            pitch = Mathf.Clamp(pitch - delta.y * orbitSensitivity, lowerPitch, upperPitch);
         }
 
         public void ConfigureTarget(Transform newTarget)

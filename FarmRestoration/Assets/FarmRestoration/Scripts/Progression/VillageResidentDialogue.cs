@@ -43,8 +43,10 @@ namespace FarmRestoration
             view.text = CreateText(panel.transform, new Vector2(0f, 58f), new Vector2(455f, 135f), 21f);
             view.firstLabel = CreateButton(panel.transform, new Vector2(-108f, -43f), "", () => view.SelectTopic(0));
             view.secondLabel = CreateButton(panel.transform, new Vector2(108f, -43f), "", () => view.SelectTopic(1));
-            CreateButton(panel.transform, new Vector2(-108f, -105f), "Next  [Enter]", view.Next);
-            CreateButton(panel.transform, new Vector2(108f, -105f), "Close  [Esc]", view.Close);
+            CreateButton(panel.transform, new Vector2(-108f, -105f),
+                Application.isMobilePlatform ? "Next" : "Next  [Enter]", view.Next);
+            CreateButton(panel.transform, new Vector2(108f, -105f),
+                Application.isMobilePlatform ? "Close" : "Close  [Esc]", view.Close);
             panel.SetActive(false);
             return view;
         }

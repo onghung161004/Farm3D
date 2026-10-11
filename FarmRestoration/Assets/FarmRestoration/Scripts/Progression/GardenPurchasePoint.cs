@@ -44,7 +44,7 @@ namespace FarmRestoration
             if (label == null) return;
             bool unlocked = progression != null && progression.IsGardenUnlocked(gardenIndex);
             label.text = unlocked ? "Area " + (gardenIndex + 1) + "\nunlocked"
-                : "Area " + (gardenIndex + 1) + "\n30 coins [E]";
+                : "Area " + (gardenIndex + 1) + (Application.isMobilePlatform ? "\n30 coins [ACTION]" : "\n30 coins [E]");
             label.color = unlocked ? new Color(0.65f, 1f, 0.6f) : Color.white;
         }
     }

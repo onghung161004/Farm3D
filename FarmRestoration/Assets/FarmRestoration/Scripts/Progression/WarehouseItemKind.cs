@@ -8,6 +8,7 @@ namespace FarmRestoration
         PumpkinSoup,
         CarrotJuice,
         TomatoSauce,
-        Milk
+        Milk,
+        Fish
     }
 }
