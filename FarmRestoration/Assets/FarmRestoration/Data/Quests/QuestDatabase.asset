@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a94c262dfdd404646a6da0c4bc7a92ed, type: 3}
+  m_Name: QuestDatabase
+  m_EditorClassIdentifier: FarmRestoration.Runtime::FarmRestoration.QuestDatabase
+  chapters:
+  - {fileID: 11400000, guid: 8f4ffe6b7862f8d4db0a783e0db4e9df, type: 2}
+  - {fileID: 11400000, guid: 3466989fdd604b74f8bcba2844216448, type: 2}
+  - {fileID: 11400000, guid: ac7b6679e5b8e734fbc0dab1862048ca, type: 2}
+  - {fileID: 11400000, guid: 6597ad6cb2c277e4bab634e786808790, type: 2}
+  - {fileID: 11400000, guid: 561b868300455f44c99d4164482af598, type: 2}

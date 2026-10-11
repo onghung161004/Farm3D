@@ -27,6 +27,14 @@ namespace FarmRestoration
         public int CarrotCount => hud == null ? 0 : hud.CropInventory.GetCount(CropType.Carrot);
         private int OrderCycleLength => cows.Length > 0 || milk > 0 ? 7 : 6;
         public event Action Changed;
+        public event Action<CropType, int> RecipeProcessed;
+        public static event Action<CropType, int> AnyRecipeProcessed;
+        public event Action<int> OrderDelivered;
+        public static event Action<int> AnyOrderDelivered;
+        public event Action<int> MoneyEarned;
+        public static event Action<int> AnyMoneyEarned;
+        public event Action<int> RepairCompleted;
+        public static event Action<int> AnyRepairCompleted;
 
         private string SavePath => Path.Combine(Application.persistentDataPath, SaveFile);
 
@@ -64,6 +72,15 @@ namespace FarmRestoration
         public int ProductCount(CropType type) => products[(int)type];
         public bool IsRepaired(int index) => index >= 0 && index < repairs.Length && repairs[index];
 
+        public void AddCoins(int amount)
+        {
+            if (amount <= 0) return;
+            coins += amount;
+            MoneyEarned?.Invoke(amount);
+            AnyMoneyEarned?.Invoke(amount);
+            NotifyAndSave();
+        }
+
         public bool TryFeedCow(CowAnimal cow)
         {
             if (!ready || cow == null || !cow.CanFeed) return false;
@@ -95,6 +112,8 @@ namespace FarmRestoration
             inTransaction = false;
             if (!spent) return false;
             products[(int)crop]++;
+            RecipeProcessed?.Invoke(crop, 1);
+            AnyRecipeProcessed?.Invoke(crop, 1);
             NotifyAndSave();
             return true;
         }
@@ -109,6 +128,10 @@ namespace FarmRestoration
                 milk--;
                 coins += 20;
                 orderIndex++;
+                MoneyEarned?.Invoke(20);
+                AnyMoneyEarned?.Invoke(20);
+                OrderDelivered?.Invoke(orderIndex);
+                AnyOrderDelivered?.Invoke(orderIndex);
                 NotifyAndSave();
                 return true;
             }
@@ -126,8 +149,13 @@ namespace FarmRestoration
                 inTransaction = false;
                 if (!spent) return false;
             }
-            coins += productOrder ? 25 : 12;
+            int earned = productOrder ? 25 : 12;
+            coins += earned;
             orderIndex++;
+            MoneyEarned?.Invoke(earned);
+            AnyMoneyEarned?.Invoke(earned);
+            OrderDelivered?.Invoke(orderIndex);
+            AnyOrderDelivered?.Invoke(orderIndex);
             NotifyAndSave();
             return true;
         }
@@ -149,6 +177,8 @@ namespace FarmRestoration
             if (!ready || index < 0 || index >= repairs.Length || repairs[index] || price < 0 || coins < price) return false;
             coins -= price;
             repairs[index] = true;
+            RepairCompleted?.Invoke(index);
+            AnyRepairCompleted?.Invoke(index);
             NotifyAndSave();
             return true;
         }
@@ -173,7 +203,8 @@ namespace FarmRestoration
                 milk = milk,
                 repairs = (bool[])repairs.Clone(),
                 plots = new PlotSaveData[plots.Length],
-                cows = new CowSaveData[cows.Length]
+                cows = new CowSaveData[cows.Length],
+                questData = QuestManager.Instance != null ? QuestManager.Instance.ExportSaveData() : null
             };
             for (int i = 0; i < plots.Length; i++)
             {
@@ -222,6 +253,10 @@ namespace FarmRestoration
                         if (saved != null && !string.IsNullOrEmpty(saved.id)) savedCows[saved.id] = saved;
                 foreach (CowAnimal cow in cows)
                     if (savedCows.TryGetValue(cow.CowId, out CowSaveData saved)) cow.Restore(saved);
+                if (QuestManager.Instance != null)
+                {
+                    QuestManager.Instance.RestoreSaveData(data.questData);
+                }
                 hud.RefreshInventory();
             }
             catch (Exception ex)
@@ -234,6 +269,10 @@ namespace FarmRestoration
                 orderIndex = 0;
                 milk = 0;
                 foreach (FarmPlot plot in plots) plot.Restore(FarmPlotState.Untilled, 0, DateTime.UtcNow);
+                if (QuestManager.Instance != null)
+                {
+                    QuestManager.Instance.RestoreSaveData(null);
+                }
                 hud.RefreshInventory();
             }
         }

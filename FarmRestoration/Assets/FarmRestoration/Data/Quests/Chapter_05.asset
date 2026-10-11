@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c22327e014669346a37f72bf35ba273, type: 3}
+  m_Name: Chapter_05
+  m_EditorClassIdentifier: FarmRestoration.Runtime::FarmRestoration.QuestChapterData
+  chapterId: Chapter_05
+  chapterTitle: 'Chapter 5: Valley Prosperity'
+  quests:
+  - {fileID: 11400000, guid: 86acaab54cfd93b4ca07134fce1a8ff6, type: 2}
+  - {fileID: 11400000, guid: 48ac9ac8f7c65cb43bc56875c31c82f9, type: 2}
+  - {fileID: 11400000, guid: 7cb37594b7feb43429f98da2e5bd2905, type: 2}

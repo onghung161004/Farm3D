@@ -14,6 +14,7 @@ namespace FarmRestoration
         public bool[] repairs = new bool[2];
         public int milk;
         public CowSaveData[] cows = Array.Empty<CowSaveData>();
+        public QuestSaveData questData;
     }
 
     [Serializable]

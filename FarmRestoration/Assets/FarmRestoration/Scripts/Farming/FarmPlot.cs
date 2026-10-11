@@ -21,6 +21,9 @@ namespace FarmRestoration
 
         public event Action<int> Harvested;
         public event Action<CropType, int> CropHarvested;
+        public event Action<CropType> CropPlanted;
+        public static event Action<CropType> AnyCropPlanted;
+        public static event Action<CropType, int> AnyCropHarvested;
         public event Action<FarmPlot> StateChanged;
 
         private int GrowthSeconds => cropType == CropType.Carrot ? 45 : cropType == CropType.Tomato ? 60 : 75;
@@ -53,6 +56,8 @@ namespace FarmRestoration
             if (CurrentState == FarmPlotState.Tilled && tool == FarmTool.Seeds)
             {
                 SetState(FarmPlotState.Seeded);
+                CropPlanted?.Invoke(cropType);
+                AnyCropPlanted?.Invoke(cropType);
                 return true;
             }
 
@@ -69,6 +74,7 @@ namespace FarmRestoration
                 SetState(FarmPlotState.Untilled);
                 Harvested?.Invoke(1);
                 CropHarvested?.Invoke(cropType, 1);
+                AnyCropHarvested?.Invoke(cropType, 1);
                 return true;
             }
 
