@@ -15,6 +15,22 @@ namespace FarmRestoration
         public int milk;
         public CowSaveData[] cows = Array.Empty<CowSaveData>();
         public QuestSaveData questData;
+        public int[] seeds;
+        public bool[] unlockedGardens;
+        public TimedOrderSaveData[] timedOrders;
+    }
+
+    [Serializable]
+    public sealed class TimedOrderSaveData
+    {
+        public string id;
+        public int cropType;
+        public bool isProduct;
+        public int amount;
+        public int reward;
+        public int bonus;
+        public long expiryUtcTicks;
+        public long fastBonusUtcTicks;
     }
 
     [Serializable]

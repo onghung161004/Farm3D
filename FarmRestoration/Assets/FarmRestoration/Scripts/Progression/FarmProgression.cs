@@ -14,13 +14,15 @@ namespace FarmRestoration
         private FarmPlot[] plots = Array.Empty<FarmPlot>();
         private CowAnimal[] cows = Array.Empty<CowAnimal>();
         private FarmHud hud;
-        private int coins;
+        private int coins = 15;
         private int orderIndex;
         private int milk;
         private bool ready;
         private bool inTransaction;
+        private readonly bool[] unlockedGardens = new bool[] { false, true, false };
 
         public static FarmProgression Instance { get; private set; }
+        public SeedInventory SeedInventory { get; } = new SeedInventory();
         public int Coins => coins;
         public int OrderIndex => orderIndex;
         public int MilkCount => milk;
@@ -69,6 +71,15 @@ namespace FarmRestoration
         private void OnApplicationPause(bool paused) { if (paused) SaveGame(); }
         private void OnApplicationQuit() => SaveGame();
 
+        public void ConfigureForTests(FarmHud testHud, FarmPlot[] testPlots, int initialCoins = 15)
+        {
+            hud = testHud;
+            plots = testPlots ?? Array.Empty<FarmPlot>();
+            cows = Array.Empty<CowAnimal>();
+            coins = initialCoins;
+            ready = true;
+        }
+
         public int ProductCount(CropType type) => products[(int)type];
         public bool IsRepaired(int index) => index >= 0 && index < repairs.Length && repairs[index];
 
@@ -79,6 +90,95 @@ namespace FarmRestoration
             MoneyEarned?.Invoke(amount);
             AnyMoneyEarned?.Invoke(amount);
             NotifyAndSave();
+        }
+
+        public int GetSeedCost(CropType crop) => crop == CropType.Carrot ? 2 : crop == CropType.Tomato ? 3 : 4;
+        public int GetCropSellPrice(CropType crop) => crop == CropType.Carrot ? 5 : crop == CropType.Tomato ? 8 : 10;
+
+        public bool TryBuySeed(CropType crop, int amount = 1)
+        {
+            if (amount <= 0) return false;
+            int totalCost = GetSeedCost(crop) * amount;
+            if (coins < totalCost) return false;
+            coins -= totalCost;
+            SeedInventory.Add(crop, amount);
+            FarmAudioFeedback.PlayCoin();
+            NotifyAndSave();
+            return true;
+        }
+
+        public bool TrySellCrop(CropType crop, int amount = 1)
+        {
+            if (amount <= 0 || hud == null || hud.CropInventory == null) return false;
+            if (hud.CropInventory.GetCount(crop) < amount) return false;
+            hud.CropInventory.TrySpend(crop, amount);
+            int earnings = GetCropSellPrice(crop) * amount;
+            AddCoins(earnings);
+            FarmAudioFeedback.PlayCoin();
+            return true;
+        }
+
+        public bool TrySpendSeed(CropType crop, int amount = 1)
+        {
+            bool spent = SeedInventory.TrySpend(crop, amount);
+            if (spent)
+            {
+                NotifyAndSave();
+                CheckAntiSoftLock();
+            }
+            return spent;
+        }
+
+        public bool CheckAntiSoftLock()
+        {
+            if (!ready) return false;
+            if (coins >= 2) return false;
+            if (SeedInventory.TotalSeeds > 0) return false;
+            if (hud != null && hud.CropInventory.Total > 0) return false;
+            if (plots != null)
+            {
+                for (int i = 0; i < plots.Length; i++)
+                {
+                    if (plots[i] != null && plots[i].CurrentState != FarmPlotState.Untilled && plots[i].CurrentState != FarmPlotState.Tilled)
+                    {
+                        return false;
+                    }
+                }
+            }
+            SeedInventory.Add(CropType.Carrot, 2);
+            Debug.Log("[Anti-Soft-Lock] Granted 2 free Carrot seeds to prevent soft-lock.");
+            NotifyAndSave();
+            return true;
+        }
+
+        public bool IsGardenUnlocked(CropType crop)
+        {
+            int idx = (int)crop;
+            return idx >= 0 && idx < unlockedGardens.Length && unlockedGardens[idx];
+        }
+
+        public int GetGardenUnlockCost(CropType crop) => crop == CropType.Pumpkin ? 20 : crop == CropType.Tomato ? 35 : 0;
+
+        public bool TryUnlockGarden(CropType crop)
+        {
+            if (IsGardenUnlocked(crop)) return true;
+            int cost = GetGardenUnlockCost(crop);
+            if (coins < cost) return false;
+            coins -= cost;
+            unlockedGardens[(int)crop] = true;
+            FarmAudioFeedback.PlayCoin();
+            NotifyAndSave();
+            return true;
+        }
+
+        public void UnlockGardenFree(CropType crop)
+        {
+            int idx = (int)crop;
+            if (idx >= 0 && idx < unlockedGardens.Length)
+            {
+                unlockedGardens[idx] = true;
+                NotifyAndSave();
+            }
         }
 
         public bool TryFeedCow(CowAnimal cow)
@@ -204,7 +304,9 @@ namespace FarmRestoration
                 repairs = (bool[])repairs.Clone(),
                 plots = new PlotSaveData[plots.Length],
                 cows = new CowSaveData[cows.Length],
-                questData = QuestManager.Instance != null ? QuestManager.Instance.ExportSaveData() : null
+                questData = QuestManager.Instance != null ? QuestManager.Instance.ExportSaveData() : null,
+                seeds = SeedInventory.Snapshot(),
+                unlockedGardens = (bool[])unlockedGardens.Clone()
             };
             for (int i = 0; i < plots.Length; i++)
             {
@@ -257,6 +359,18 @@ namespace FarmRestoration
                 {
                     QuestManager.Instance.RestoreSaveData(data.questData);
                 }
+                SeedInventory.Restore(data.seeds);
+                if (data.unlockedGardens != null)
+                {
+                    for (int i = 0; i < unlockedGardens.Length && i < data.unlockedGardens.Length; i++)
+                        unlockedGardens[i] = data.unlockedGardens[i];
+                }
+                else
+                {
+                    unlockedGardens[0] = false;
+                    unlockedGardens[1] = true;
+                    unlockedGardens[2] = false;
+                }
                 hud.RefreshInventory();
             }
             catch (Exception ex)
@@ -265,9 +379,13 @@ namespace FarmRestoration
                 hud.CropInventory.Restore(null);
                 Array.Clear(products, 0, products.Length);
                 Array.Clear(repairs, 0, repairs.Length);
-                coins = 0;
+                coins = 15;
                 orderIndex = 0;
                 milk = 0;
+                SeedInventory.Restore(null);
+                unlockedGardens[0] = false;
+                unlockedGardens[1] = true;
+                unlockedGardens[2] = false;
                 foreach (FarmPlot plot in plots) plot.Restore(FarmPlotState.Untilled, 0, DateTime.UtcNow);
                 if (QuestManager.Instance != null)
                 {

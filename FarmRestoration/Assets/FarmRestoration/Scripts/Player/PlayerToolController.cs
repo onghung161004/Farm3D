@@ -250,7 +250,7 @@ namespace FarmRestoration
         {
             IInteractable target = TryFindTarget(out IInteractable foundTarget) ? foundTarget : null;
             string nextPrompt = target == null ? NoTargetPrompt : target.GetInteractionPrompt(SelectedTool);
-            if (target is FarmPlot plot && FarmGardenBatch.IsGardenPlot(plot))
+            if (target is FarmPlot plot && FarmGardenBatch.IsGardenPlot(plot) && (FarmProgression.Instance == null || FarmProgression.Instance.IsGardenUnlocked(plot.CropType)))
                 nextPrompt += "  |  Hold E: all 9 plots";
             if (ReferenceEquals(currentTarget, target) && currentPrompt == nextPrompt)
             {

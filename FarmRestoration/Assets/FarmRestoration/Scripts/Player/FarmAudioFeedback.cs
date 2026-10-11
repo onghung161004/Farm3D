@@ -30,8 +30,11 @@ namespace FarmRestoration
         private float lastWaterTime = float.NegativeInfinity;
         private int stepIndex;
 
+        public static FarmAudioFeedback Instance { get; private set; }
+
         private void Awake()
         {
+            Instance = this;
             controller = GetComponent<CharacterController>();
             movement = GetComponent<PlayerMovement>();
             tools = GetComponent<PlayerToolController>();
@@ -50,6 +53,14 @@ namespace FarmRestoration
             lastPosition = transform.position;
         }
 
+        public static void PlayCoin()
+        {
+            if (Instance != null && Instance.actionSource != null && Instance.order != null)
+            {
+                Instance.actionSource.PlayOneShot(Instance.order, Instance.actionVolume);
+            }
+        }
+
         private void OnEnable()
         {
             tools.InteractionSucceeded += OnInteractionSucceeded;
@@ -65,6 +76,7 @@ namespace FarmRestoration
 
         private void OnDestroy()
         {
+            if (Instance == this) Instance = null;
             if (water != null && water != waterSource) Destroy(water);
         }
 

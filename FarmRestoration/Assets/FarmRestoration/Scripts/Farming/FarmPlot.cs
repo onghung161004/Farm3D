@@ -47,6 +47,15 @@ namespace FarmRestoration
 
         public bool TryInteract(FarmTool tool)
         {
+            if (FarmProgression.Instance != null && !FarmProgression.Instance.IsGardenUnlocked(cropType))
+            {
+                if (FarmProgression.Instance.TryUnlockGarden(cropType))
+                {
+                    return true;
+                }
+                return false;
+            }
+
             if (CurrentState == FarmPlotState.Untilled && tool == FarmTool.Hoe)
             {
                 SetState(FarmPlotState.Tilled);
@@ -55,6 +64,10 @@ namespace FarmRestoration
 
             if (CurrentState == FarmPlotState.Tilled && tool == FarmTool.Seeds)
             {
+                if (FarmProgression.Instance != null && !FarmProgression.Instance.TrySpendSeed(cropType))
+                {
+                    return false;
+                }
                 SetState(FarmPlotState.Seeded);
                 CropPlanted?.Invoke(cropType);
                 AnyCropPlanted?.Invoke(cropType);
@@ -125,6 +138,14 @@ namespace FarmRestoration
 
         public string GetInteractionPrompt(FarmTool tool)
         {
+            if (FarmProgression.Instance != null && !FarmProgression.Instance.IsGardenUnlocked(cropType))
+            {
+                int cost = FarmProgression.Instance.GetGardenUnlockCost(cropType);
+                if (FarmProgression.Instance.Coins >= cost)
+                    return $"[Locked] {cropType} Garden  [E: Unlock for {cost} coins]";
+                return $"[Locked] {cropType} Garden (Unlock: {cost} coins or Quest)";
+            }
+
             if (CurrentState == FarmPlotState.Untilled)
             {
                 return tool == FarmTool.Hoe ? "Till soil" : "Select Hoe";
@@ -132,7 +153,13 @@ namespace FarmRestoration
 
             if (CurrentState == FarmPlotState.Tilled)
             {
-                return tool == FarmTool.Seeds ? "Plant seeds" : "Select Seeds";
+                if (tool == FarmTool.Seeds)
+                {
+                    if (FarmProgression.Instance != null && FarmProgression.Instance.SeedInventory.GetCount(cropType) <= 0)
+                        return $"No {cropType} seeds! Buy at Trader";
+                    return "Plant seeds";
+                }
+                return "Select Seeds";
             }
 
             if (CurrentState == FarmPlotState.Seeded)
