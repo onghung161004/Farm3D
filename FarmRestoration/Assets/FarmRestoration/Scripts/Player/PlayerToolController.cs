@@ -30,6 +30,9 @@ namespace FarmRestoration
         private float nextBatchTime;
         private int batchIndex;
         private bool batchStarted;
+        private bool mobileInteractHeld;
+        private bool mobileInteractPressed;
+        private bool mobileInteractReleased;
 
         public FarmTool SelectedTool { get; private set; } = FarmTool.Hoe;
         public CropType SelectedCropType { get; private set; } = CropType.Pumpkin;
@@ -57,28 +60,58 @@ namespace FarmRestoration
 
         private void Update()
         {
+            if (FishingSession.IsFishing) { CancelHeldGarden(); ClearMobileInteract(); return; }
             HandleToolSelectionInput();
             UpdateInteractionPrompt();
 
-            if (VillageOrderDialogue.IsOpen || FarmWarehouseView.IsOpen || VillageResidentDialogue.IsOpen) return;
+            if (VillageOrderDialogue.IsOpen || FarmWarehouseView.IsOpen || VillageResidentDialogue.IsOpen)
+            {
+                CancelHeldGarden();
+                ClearMobileInteract();
+                return;
+            }
 
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null) HandleInteractKey(keyboard);
+            HandleInteractInput(
+                (keyboard != null && keyboard.eKey.wasPressedThisFrame) || mobileInteractPressed,
+                (keyboard != null && keyboard.eKey.isPressed) || mobileInteractHeld,
+                (keyboard != null && keyboard.eKey.wasReleasedThisFrame) || mobileInteractReleased);
+            mobileInteractPressed = false;
+            mobileInteractReleased = false;
 
-            if (keyboard != null && keyboard.rKey.wasPressedThisFrame
-                && TryFindTarget(out IInteractable recipeTarget)
-                && recipeTarget is FarmProductionStation station && station.CycleRecipe())
-            {
-                UpdateInteractionPrompt();
-            }
+            if (keyboard != null && keyboard.rKey.wasPressedThisFrame) TryCycleRecipe();
 
         }
 
-        private void OnDisable() => CancelHeldGarden();
+        private void OnDisable() { CancelHeldGarden(); ClearMobileInteract(); }
 
-        private void HandleInteractKey(Keyboard keyboard)
+        public void SetMobileInteractHeld(bool held)
         {
-            if (keyboard.eKey.wasPressedThisFrame)
+            if (held && !mobileInteractHeld) mobileInteractPressed = true;
+            if (!held && mobileInteractHeld) mobileInteractReleased = true;
+            mobileInteractHeld = held;
+        }
+
+        public bool TryCycleRecipe()
+        {
+            if (FishingSession.IsFishing || VillageOrderDialogue.IsOpen || FarmWarehouseView.IsOpen
+                || VillageResidentDialogue.IsOpen) return false;
+            bool changed = TryFindTarget(out IInteractable target)
+                && target is FarmProductionStation station && station.CycleRecipe();
+            if (changed) UpdateInteractionPrompt();
+            return changed;
+        }
+
+        private void ClearMobileInteract()
+        {
+            mobileInteractHeld = false;
+            mobileInteractPressed = false;
+            mobileInteractReleased = false;
+        }
+
+        private void HandleInteractInput(bool pressed, bool held, bool released)
+        {
+            if (pressed)
             {
                 IInteractable target = TryFindTarget(out IInteractable found) ? found : null;
                 if (target != null && !(target is FarmPlot))
@@ -113,7 +146,7 @@ namespace FarmRestoration
                 return;
             }
 
-            if (keyboard.eKey.wasReleasedThisFrame)
+            if (released)
             {
                 if (!batchStarted)
                 {
@@ -125,7 +158,7 @@ namespace FarmRestoration
                 return;
             }
 
-            if (!keyboard.eKey.isPressed || Time.unscaledTime - heldSince < batchHoldSeconds) return;
+            if (!held || Time.unscaledTime - heldSince < batchHoldSeconds) return;
             if (!batchStarted)
             {
                 batchStarted = true;

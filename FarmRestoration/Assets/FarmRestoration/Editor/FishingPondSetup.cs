@@ -75,14 +75,21 @@ namespace FarmRestoration.Editor
             Transform pond = valley.Find(RootName);
             MeshFilter water = pond?.Find("Water")?.GetComponent<MeshFilter>();
             MeshFilter shore = pond?.Find("Shore")?.GetComponent<MeshFilter>();
+            FishingPondSpot spot = pond?.Find("FishingSpot")?.GetComponent<FishingPondSpot>();
             bool valid = pond?.Find(VersionMarker) != null && water != null
                 && water.sharedMesh != null && water.sharedMesh.vertexCount == Segments + 1
                 && shore != null && shore.sharedMesh != null && shore.sharedMesh.vertexCount == Segments * 2
                 && pond.Find("Water").GetComponent<Renderer>()?.sharedMaterial == WaterMaterial
                 && pond.Find("Shore").GetComponent<Renderer>()?.sharedMaterial
                     == AssetDatabase.LoadAssetAtPath<Material>(BankPath)
+                && spot != null && spot.GetComponent<SphereCollider>() != null
+                && spot.GetComponent<FishingSession>() != null
                 && IsBasinCarved(valley.Find("WalkableValleyTerrain")?.GetComponent<MeshCollider>());
-            return valid ? false : Build(scene);
+            if (!valid) return Build(scene);
+            bool riverChanged = FishingPondSpot.EnsureRiverSpots(valley,
+                valley.Find("WalkableValleyTerrain")?.GetComponent<MeshCollider>());
+            if (riverChanged) EditorSceneManager.MarkSceneDirty(scene);
+            return riverChanged;
         }
 
         internal static bool Build(Scene scene)
@@ -108,6 +115,8 @@ namespace FarmRestoration.Editor
             }
             BuildWater(pond, water);
             BuildBank(pond, terrain, bank);
+            FishingPondSpot.EnsureAt(pond, terrain);
+            FishingPondSpot.EnsureRiverSpots(valley, terrain);
             if (pond.Find(VersionMarker) == null) new GameObject(VersionMarker).transform.SetParent(pond, false);
             EditorSceneManager.MarkSceneDirty(scene);
             return true;

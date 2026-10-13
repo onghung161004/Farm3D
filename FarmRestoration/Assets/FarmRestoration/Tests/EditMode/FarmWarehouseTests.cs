@@ -16,6 +16,7 @@ namespace FarmRestoration.Tests.EditMode
             Assert.That(FarmProgression.SellPrice(WarehouseItemKind.CarrotJuice), Is.EqualTo(15));
             Assert.That(FarmProgression.SellPrice(WarehouseItemKind.TomatoSauce), Is.EqualTo(15));
             Assert.That(FarmProgression.SellPrice(WarehouseItemKind.Milk), Is.EqualTo(10));
+            Assert.That(FarmProgression.SellPrice(WarehouseItemKind.Fish), Is.EqualTo(8));
             Assert.That(FarmProgression.SellPrice((WarehouseItemKind)99), Is.Zero);
             Assert.That(3 * FarmProgression.SellPrice(WarehouseItemKind.Pumpkin), Is.LessThan(12));
         }
@@ -33,14 +34,25 @@ namespace FarmRestoration.Tests.EditMode
                 int[] products = (int[])typeof(FarmProgression).GetField("products", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(game);
                 products[0] = 2;
                 typeof(FarmProgression).GetField("milk", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(game, 3);
+                typeof(FarmProgression).GetField("fish", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(game, 2);
                 Assert.That(game.StockCount(WarehouseItemKind.Pumpkin), Is.EqualTo(4));
                 Assert.That(game.StockCount(WarehouseItemKind.PumpkinSoup), Is.EqualTo(2));
                 Assert.That(game.StockCount(WarehouseItemKind.Milk), Is.EqualTo(3));
+                Assert.That(game.StockCount(WarehouseItemKind.Fish), Is.EqualTo(2));
                 Assert.That(game.StockCount((WarehouseItemKind)(-1)), Is.Zero);
                 Assert.That(game.TrySell((WarehouseItemKind)99), Is.False);
                 Assert.That(game.Coins, Is.Zero);
             }
             finally { Object.DestroyImmediate(hudObject); }
+        }
+
+        [Test]
+        public void OldSaveWithoutFishKeepsZeroFish()
+        {
+            FarmSaveData old = JsonUtility.FromJson<FarmSaveData>("{\"version\":3,\"coins\":17,\"milk\":2}");
+            Assert.That(old.coins, Is.EqualTo(17));
+            Assert.That(old.milk, Is.EqualTo(2));
+            Assert.That(old.fish, Is.Zero);
         }
     }
 }

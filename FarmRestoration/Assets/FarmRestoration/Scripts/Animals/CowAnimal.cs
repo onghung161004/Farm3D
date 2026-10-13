@@ -27,6 +27,7 @@ namespace FarmRestoration
         public string CowId => cowId;
         public bool IsPenned => penned;
         public bool IsFollowing => following;
+        public CowPen HomePen => pen;
         public bool CanFeed => penned && milkReadyUtcTicks == 0;
         public event Action<CowAnimal> StateChanged;
 
@@ -47,6 +48,7 @@ namespace FarmRestoration
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (lead == null) lead = GetComponent<LineRenderer>();
             if (lead != null) lead.enabled = false;
+            if (GetComponent<CowAudioFeedback>() == null) gameObject.AddComponent<CowAudioFeedback>();
         }
 
         private void Update()

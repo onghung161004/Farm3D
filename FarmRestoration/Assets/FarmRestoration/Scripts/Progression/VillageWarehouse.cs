@@ -33,7 +33,7 @@ namespace FarmRestoration
             sign.transform.SetParent(crate.transform, false);
             sign.transform.localPosition = new Vector3(0f, 1.25f, 0f);
             TextMesh label = sign.GetComponent<TextMesh>();
-            label.text = "WAREHOUSE  [E]";
+            label.text = Application.isMobilePlatform ? "WAREHOUSE [ACTION]" : "WAREHOUSE [E]";
             label.anchor = TextAnchor.MiddleCenter;
             label.alignment = TextAlignment.Center;
             label.fontSize = 54;

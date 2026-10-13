@@ -40,11 +40,13 @@ namespace FarmRestoration
             rect.sizeDelta = new Vector2(560f, 320f);
             panel.GetComponent<Image>().color = new Color(0.055f, 0.11f, 0.13f, 0.98f);
             VillageResidentDialogue view = panel.GetComponent<VillageResidentDialogue>();
-            view.text = CreateText(panel.transform, new Vector2(0f, 65f), new Vector2(510f, 140f), 22f);
-            view.firstLabel = CreateButton(panel.transform, new Vector2(-120f, -48f), "", () => view.SelectTopic(0));
-            view.secondLabel = CreateButton(panel.transform, new Vector2(120f, -48f), "", () => view.SelectTopic(1));
-            CreateButton(panel.transform, new Vector2(-120f, -108f), "Next  [Enter]", view.Next);
-            CreateButton(panel.transform, new Vector2(120f, -108f), "Close  [Esc]", view.Close);
+            view.text = CreateText(panel.transform, new Vector2(0f, 58f), new Vector2(455f, 135f), 21f);
+            view.firstLabel = CreateButton(panel.transform, new Vector2(-108f, -43f), "", () => view.SelectTopic(0));
+            view.secondLabel = CreateButton(panel.transform, new Vector2(108f, -43f), "", () => view.SelectTopic(1));
+            CreateButton(panel.transform, new Vector2(-108f, -105f),
+                Application.isMobilePlatform ? "Next" : "Next  [Enter]", view.Next);
+            CreateButton(panel.transform, new Vector2(108f, -105f),
+                Application.isMobilePlatform ? "Close" : "Close  [Esc]", view.Close);
             panel.SetActive(false);
             return view;
         }

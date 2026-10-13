@@ -5,7 +5,7 @@ namespace FarmRestoration
     [Serializable]
     public sealed class FarmSaveData
     {
-        public int version = 3;
+        public int version = 4;
         public PlotSaveData[] plots = Array.Empty<PlotSaveData>();
         public int[] crops = new int[3];
         public int[] products = new int[3];
@@ -14,6 +14,7 @@ namespace FarmRestoration
         public bool[] repairs = new bool[2];
         public bool[] gardenUnlocks = new bool[3];
         public int milk;
+        public int fish;
         public CowSaveData[] cows = Array.Empty<CowSaveData>();
         public QuestSaveData questData;
         public int[] seeds;

@@ -29,6 +29,8 @@ namespace FarmRestoration
 
         private void OnEnable()
         {
+            CowLeadGuide.Ensure(this);
+            MobileGameControls.Ensure(this, toolController);
             EnsureCropSelectionButtons();
             ConfigureTextRendering();
             Subscribe();
@@ -222,6 +224,11 @@ namespace FarmRestoration
         {
             if (promptLabel != null)
             {
+                if (Application.isMobilePlatform && !string.IsNullOrEmpty(prompt))
+                    prompt = prompt.Replace("Hold E", "Hold ACTION")
+                        .Replace("[E", "[ACTION")
+                        .Replace("[R change]", "[RECIPE]")
+                        .Replace(" (5/6/7)", " (tap a crop)");
                 promptLabel.text = FarmHudPresentation.PromptText(prompt);
             }
         }

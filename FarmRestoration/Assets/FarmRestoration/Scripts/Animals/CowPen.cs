@@ -7,6 +7,9 @@ namespace FarmRestoration
     {
         [SerializeField] private Vector2 size = new Vector2(10f, 10f);
 
+        public Vector2 Footprint => size;
+        public Vector3 GatePosition => transform.TransformPoint(new Vector3(0f, 0f, -size.y * 0.5f));
+
         public void Configure(Vector2 footprint) => size = footprint;
 
         public bool Contains(Vector3 worldPosition, float margin = 0f)

@@ -10,7 +10,7 @@ namespace FarmRestoration
     {
         private static readonly string[] Names =
         {
-            "Pumpkin", "Carrot", "Tomato", "Pumpkin soup", "Carrot juice", "Tomato sauce", "Milk"
+            "Pumpkin", "Carrot", "Tomato", "Pumpkin soup", "Carrot juice", "Tomato sauce", "Milk", "Fish"
         };
         private static FarmWarehouseView instance;
         private TMP_Text summary;
@@ -38,10 +38,10 @@ namespace FarmRestoration
             panel.transform.SetParent(canvas.transform, false);
             RectTransform rect = (RectTransform)panel.transform;
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(560f, 480f);
+            rect.sizeDelta = new Vector2(490f, 500f);
             panel.GetComponent<Image>().color = new Color(0.055f, 0.11f, 0.13f, 0.98f);
             FarmWarehouseView view = panel.GetComponent<FarmWarehouseView>();
-            view.summary = CreateText(panel.transform, "Summary", new Vector2(0f, 185f), new Vector2(520f, 75f), 22f);
+            view.summary = CreateText(panel.transform, "Summary", new Vector2(0f, 200f), new Vector2(455f, 72f), 18f);
             view.rows = new TMP_Text[Names.Length];
             for (int i = 0; i < Names.Length; i++)
             {
