@@ -9,6 +9,7 @@ namespace FarmRestoration
         CarrotJuice,
         TomatoSauce,
         Milk,
-        Fish
+        Fish,
+        Wood
     }
 }

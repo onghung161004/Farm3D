@@ -8,6 +8,7 @@ namespace FarmRestoration.Tests.EditMode
         [TestCase(2, FarmTool.Seeds)]
         [TestCase(3, FarmTool.WateringCan)]
         [TestCase(4, FarmTool.Harvest)]
+        [TestCase(8, FarmTool.Axe)]
         public void TryGetTool_ValidShortcut_ReturnsMappedTool(int shortcutIndex, FarmTool expectedTool)
         {
             bool mapped = PlayerToolSelection.TryGetTool(shortcutIndex, out FarmTool tool);

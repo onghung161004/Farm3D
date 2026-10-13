@@ -17,6 +17,8 @@ namespace FarmRestoration
         private float verticalVelocity;
         private Vector3 planarVelocity;
         private Vector2 mobileInput;
+        private readonly PlayerMapBoundary mapBoundary = new PlayerMapBoundary();
+        private float nextBoundaryLookup;
 
         public bool IsMoving { get; private set; }
         public bool ControlsLocked { get; private set; }
@@ -52,9 +54,32 @@ namespace FarmRestoration
             planarVelocity = Vector3.MoveTowards(planarVelocity, targetVelocity, speedChange * Time.deltaTime);
             IsMoving = planarVelocity.sqrMagnitude > 0.01f;
 
-            characterController.Move(planarVelocity * Time.deltaTime);
+            ResolveMapBoundary();
+            Vector3 proposed = transform.position + planarVelocity * Time.deltaTime;
+            Vector3 constrained = mapBoundary.Constrain(proposed, characterController.radius + characterController.skinWidth);
+            characterController.Move(constrained - transform.position);
             ApplyGravity();
+            if (mapBoundary.TryRecover(transform.position, out Vector3 recovery))
+            {
+                if (FishingSession.Active != null) FishingSession.Active.Cancel();
+                characterController.enabled = false;
+                transform.position = recovery;
+                characterController.enabled = true;
+                verticalVelocity = 0f;
+                planarVelocity = Vector3.zero;
+                mobileInput = Vector2.zero;
+                IsMoving = false;
+                return;
+            }
             RotateTowards(planarVelocity);
+        }
+
+        private void ResolveMapBoundary()
+        {
+            if (mapBoundary.HasTerrain || Time.unscaledTime < nextBoundaryLookup) return;
+            nextBoundaryLookup = Time.unscaledTime + 1f;
+            MeshCollider ground = GameObject.Find("WalkableValleyTerrain")?.GetComponent<MeshCollider>();
+            if (ground != null) mapBoundary.Configure(ground);
         }
 
         public void ConfigureCamera(Camera cameraToFollow)

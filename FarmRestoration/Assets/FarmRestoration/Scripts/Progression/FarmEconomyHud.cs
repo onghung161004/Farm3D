@@ -48,17 +48,8 @@ namespace FarmRestoration
         {
             if (label == null) return;
             FarmProgression state = game != null ? game : FarmProgression.Instance;
-            if (state == null)
-            {
-                label.text = "Village loading...";
-                return;
-            }
-
-            string seedText = state.SeedInventory != null
-                ? $"  SEEDS C:{state.SeedInventory.GetCount(CropType.Carrot)} P:{state.SeedInventory.GetCount(CropType.Pumpkin)} T:{state.SeedInventory.GetCount(CropType.Tomato)}"
-                : "";
-
-            label.text = "COINS  " + state.Coins + "  MILK " + state.MilkCount + seedText
+            label.text = state == null ? "Village loading..."
+                : "COINS  " + state.Coins + "  MILK " + state.MilkCount + "  WOOD " + state.WoodCount
                 + "\nSoup " + state.ProductCount(CropType.Pumpkin)
                 + "  Juice " + state.ProductCount(CropType.Carrot)
                 + "  Sauce " + state.ProductCount(CropType.Tomato)

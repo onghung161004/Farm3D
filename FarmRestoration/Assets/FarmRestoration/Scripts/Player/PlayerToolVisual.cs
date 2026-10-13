@@ -75,6 +75,7 @@ namespace FarmRestoration
         private bool TryInitialize()
         {
             if (!IsConfigured) return false;
+            if (Application.isPlaying) AxeToolVisual.Ensure(toolHolder);
             holderBasePosition = toolHolder.localPosition;
             holderBaseRotation = toolHolder.localRotation;
             ShowTool(toolController.SelectedTool);

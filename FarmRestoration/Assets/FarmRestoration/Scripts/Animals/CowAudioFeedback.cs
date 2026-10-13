@@ -39,7 +39,7 @@ namespace FarmRestoration
             source.rolloffMode = AudioRolloffMode.Linear;
             source.minDistance = 2f;
             source.maxDistance = 15f;
-            source.volume = 0.75f;
+            FarmAudioChannel.Bind(source, FarmAudioGroup.Effects, 0.75f);
             nextAmbientTime = Time.time + Random.Range(4f, 15f);
         }
 

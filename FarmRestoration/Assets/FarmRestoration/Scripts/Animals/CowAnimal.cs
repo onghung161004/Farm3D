@@ -23,12 +23,17 @@ namespace FarmRestoration
         private bool penned;
         private bool following;
         private long milkReadyUtcTicks;
+        private CowLifeCycle lifeCycle;
 
         public string CowId => cowId;
         public bool IsPenned => penned;
         public bool IsFollowing => following;
         public CowPen HomePen => pen;
-        public bool CanFeed => penned && milkReadyUtcTicks == 0;
+        public MeshCollider Ground => valleyGround;
+        public CowLifeCycle LifeCycle => lifeCycle != null ? lifeCycle
+            : lifeCycle = GetComponent<CowLifeCycle>() ?? gameObject.AddComponent<CowLifeCycle>();
+        public bool IsCalf => LifeCycle.IsCalfAt(DateTime.UtcNow);
+        public bool CanFeed => penned && !IsCalf && milkReadyUtcTicks == 0;
         public event Action<CowAnimal> StateChanged;
 
         public void Configure(string id, CowPen homePen, MeshCollider ground, Animator cowAnimator, LineRenderer rope)
@@ -39,12 +44,14 @@ namespace FarmRestoration
             animator = cowAnimator;
             lead = rope;
             home = transform.position;
+            lifeCycle = GetComponent<CowLifeCycle>() ?? gameObject.AddComponent<CowLifeCycle>();
             if (lead != null) lead.enabled = false;
         }
 
         private void Awake()
         {
             home = transform.position;
+            lifeCycle = GetComponent<CowLifeCycle>() ?? gameObject.AddComponent<CowLifeCycle>();
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (lead == null) lead = GetComponent<LineRenderer>();
             if (lead != null) lead.enabled = false;
@@ -143,6 +150,7 @@ namespace FarmRestoration
             }
             if (penned)
             {
+                if (IsCalf) return false;
                 FarmProgression game = FarmProgression.Instance;
                 if (game == null) return false;
                 if (CanMilk(DateTime.UtcNow)) return game.TryMilkCow(this);
@@ -160,23 +168,29 @@ namespace FarmRestoration
             if (following) return pen != null && pen.Contains(transform.position, 0.6f)
                 ? "Cow: E release into pen" : "Cow: E release lead (bring to pen)";
             if (!penned) return "Cow: E attach lead";
+            if (IsCalf)
+                return "Calf growing: " + Mathf.CeilToInt((float)TimeSpan.FromTicks(
+                    Math.Max(0, LifeCycle.GrownUtcTicks - DateTime.UtcNow.Ticks)).TotalSeconds) + "s to adult";
             if (CanMilk(DateTime.UtcNow)) return "Cow: E milk (+1 milk)";
             if (CanFeed) return FarmProgression.Instance != null && FarmProgression.Instance.CarrotCount < 1
-                ? "Cow: needs 1 carrot to feed" : "Cow: E feed (1 carrot)";
+                ? "Cow: needs 1 carrot to feed" : "Cow: E feed (1 carrot) | Feed two adults for a calf";
             TimeSpan remaining = new TimeSpan(Math.Max(0, milkReadyUtcTicks - DateTime.UtcNow.Ticks));
-            return "Cow: milk in " + Mathf.CeilToInt((float)remaining.TotalSeconds) + "s";
+            return "Cow: milk in " + Mathf.CeilToInt((float)remaining.TotalSeconds) + "s"
+                + (LifeCycle.CanBreed(DateTime.UtcNow) ? " | Feed another adult in this pen for a calf" : "");
         }
 
         public bool Feed(DateTime now)
         {
             if (!CanFeed) return false;
             milkReadyUtcTicks = now.AddSeconds(MilkDelaySeconds).Ticks;
+            LifeCycle.RecordFeed(now);
             eatingUntil = Time.time + 2.5f;
             StateChanged?.Invoke(this);
             return true;
         }
 
-        public bool CanMilk(DateTime now) => penned && milkReadyUtcTicks > 0 && now.Ticks >= milkReadyUtcTicks;
+        public bool CanMilk(DateTime now) => penned && !LifeCycle.IsCalfAt(now)
+            && milkReadyUtcTicks > 0 && now.Ticks >= milkReadyUtcTicks;
 
         public bool Milk(DateTime now)
         {
@@ -192,18 +206,28 @@ namespace FarmRestoration
             if (lead != null) lead.enabled = false;
         }
 
-        public CowSaveData Snapshot() => new CowSaveData
+        public void NotifyLifeCycleChanged() => StateChanged?.Invoke(this);
+
+        public CowSaveData Snapshot()
         {
-            id = cowId,
-            penned = penned,
-            x = transform.position.x,
-            z = transform.position.z,
-            milkReadyUtcTicks = milkReadyUtcTicks
-        };
+            var saved = new CowSaveData
+            {
+                id = cowId,
+                penned = penned,
+                penId = pen == null ? null : pen.PenId,
+                x = transform.position.x,
+                z = transform.position.z,
+                milkReadyUtcTicks = milkReadyUtcTicks
+            };
+            LifeCycle.WriteTo(saved);
+            return saved;
+        }
 
         public void Restore(CowSaveData saved)
         {
             if (saved == null) return;
+            if (!string.IsNullOrEmpty(saved.id)) cowId = saved.id;
+            LifeCycle.Restore(saved, DateTime.UtcNow);
             penned = saved.penned;
             following = false;
             milkReadyUtcTicks = Math.Max(0, saved.milkReadyUtcTicks);

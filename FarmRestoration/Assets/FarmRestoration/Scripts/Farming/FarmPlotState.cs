@@ -15,6 +15,7 @@ namespace FarmRestoration
         Hoe,
         Seeds,
         WateringCan,
-        Harvest
+        Harvest,
+        Axe
     }
 }

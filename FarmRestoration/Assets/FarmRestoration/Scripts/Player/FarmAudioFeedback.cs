@@ -21,9 +21,10 @@ namespace FarmRestoration
         private PlayerToolController tools;
         private AudioSource footstepSource;
         private AudioSource actionSource;
+        private FarmAudioChannel footstepsChannel;
         private AudioClip[] grassSteps;
         private AudioClip[] woodSteps;
-        private AudioClip hoe, seeds, water, waterSource, harvest, production, order, repair;
+        private AudioClip hoe, woodChop, seeds, water, waterSource, harvest, production, order, repair;
         private Vector3 lastPosition;
         private float walkedDistance;
         private float lastStepTime = float.NegativeInfinity;
@@ -40,9 +41,12 @@ namespace FarmRestoration
             tools = GetComponent<PlayerToolController>();
             footstepSource = CreateSource("Footsteps");
             actionSource = CreateSource("Farm actions");
+            footstepsChannel = FarmAudioChannel.Bind(footstepSource, FarmAudioGroup.Effects, footstepVolume);
+            FarmAudioChannel.Bind(actionSource, FarmAudioGroup.Effects, 1f);
             grassSteps = LoadSteps(GrassNames);
             woodSteps = LoadSteps(WoodNames);
             hoe = Load("chop");
+            woodChop = Load("wood_hit_01") ?? hoe;
             seeds = Load("cloth1");
             waterSource = Load("loop_water_01");
             water = CreateWaterClip(waterSource);
@@ -101,7 +105,7 @@ namespace FarmRestoration
             lastStepTime = Time.time;
             footstepSource.Stop();
             footstepSource.clip = clip;
-            footstepSource.volume = footstepVolume;
+            footstepsChannel.SetBaseVolume(footstepVolume);
             footstepSource.pitch = Random.Range(0.97f, 1.03f);
             footstepSource.Play();
         }
@@ -142,6 +146,8 @@ namespace FarmRestoration
             else if (target is FarmProductionStation) clip = production;
             else if (target is VillageOrderNpc) clip = order;
             else if (target is VillageRepairPoint) clip = repair;
+            else if (target is ChoppableTree) clip = woodChop;
+            else if (target is LumberWorkshop) clip = repair;
             else return;
 
             if (clip == null) return;

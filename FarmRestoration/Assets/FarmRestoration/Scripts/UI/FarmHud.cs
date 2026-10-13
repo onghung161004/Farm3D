@@ -29,9 +29,13 @@ namespace FarmRestoration
 
         private void OnEnable()
         {
+            if (Application.isPlaying) FarmBackgroundMusic.Ensure(this);
+            if (Application.isPlaying) FarmAudioSettingsView.Ensure(this);
             CowLeadGuide.Ensure(this);
             MobileGameControls.Ensure(this, toolController);
             EnsureCropSelectionButtons();
+            AxeHotbarButton.Ensure(this, toolController);
+            WoodcuttingGuide.Ensure(this, toolController);
             ConfigureTextRendering();
             Subscribe();
             cropInventory.Changed += OnCropInventoryChanged;
@@ -114,6 +118,8 @@ namespace FarmRestoration
             Unsubscribe();
             toolController = controller;
             farmPlot = plot;
+            AxeHotbarButton.Ensure(this, toolController);
+            WoodcuttingGuide.Ensure(this, toolController);
             Subscribe();
             Refresh();
         }
@@ -133,6 +139,8 @@ namespace FarmRestoration
             promptLabel = prompt;
             toolLabel = null;
             cropsLabel = null;
+            AxeHotbarButton.Ensure(this, toolController);
+            WoodcuttingGuide.Ensure(this, toolController);
             Refresh();
         }
 

@@ -110,7 +110,7 @@ namespace FarmRestoration
         private void Update()
         {
             bool canControl = !FishingSession.IsFishing && !VillageOrderDialogue.IsOpen
-                && !VillageResidentDialogue.IsOpen && !FarmWarehouseView.IsOpen;
+                && !VillageResidentDialogue.IsOpen && !FarmWarehouseView.IsOpen && !FarmQuestView.IsOpen && !FarmAudioSettingsView.IsOpen;
             if (controlsVisible != canControl)
             {
                 controlsVisible = canControl;

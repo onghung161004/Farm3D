@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 
 namespace FarmRestoration.Editor
 {
-    /// <summary>Installs the runtime day/night driver on FarmDemo's existing directional light.</summary>
+    /// <summary>Installs daylight/weather lighting on FarmDemo's existing directional light.</summary>
     public static class FarmDayNightSetup
     {
         internal static void Install(Scene scene)
@@ -19,7 +19,7 @@ namespace FarmRestoration.Editor
             EditorSceneManager.MarkSceneDirty(scene);
         }
 
-        [MenuItem("Tools/Farm Restoration/Install Day Night Cycle")]
+        [MenuItem("Tools/Farm Restoration/Install Daylight Lighting")]
         public static void InstallForFarmDemo()
         {
             Scene scene = SceneManager.GetActiveScene();
@@ -31,7 +31,7 @@ namespace FarmRestoration.Editor
 
             Install(scene);
             AssetDatabase.SaveAssets();
-            Debug.Log("Day/night cycle installed on Directional Light.");
+            Debug.Log("Permanent daylight with weather lighting installed on Directional Light.");
         }
     }
 }

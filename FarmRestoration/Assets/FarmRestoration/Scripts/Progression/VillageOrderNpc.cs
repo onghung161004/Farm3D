@@ -8,7 +8,9 @@ namespace FarmRestoration
         public bool TryInteract(FarmTool tool)
         {
             if (FarmProgression.Instance == null) return false;
-            return VillageOrderDialogue.Show(this);
+            bool opened = VillageOrderDialogue.Show(this);
+            if (opened) FarmProgression.Instance.RecordQuestTalk();
+            return opened;
         }
 
         public string GetInteractionPrompt(FarmTool tool)

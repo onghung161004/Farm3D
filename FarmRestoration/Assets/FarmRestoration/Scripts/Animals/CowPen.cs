@@ -6,11 +6,15 @@ namespace FarmRestoration
     public sealed class CowPen : MonoBehaviour
     {
         [SerializeField] private Vector2 size = new Vector2(10f, 10f);
+        [SerializeField, Min(2)] private int capacity = 8;
 
         public Vector2 Footprint => size;
+        public int Capacity => capacity;
+        public string PenId => (transform.parent == null ? "" : transform.parent.name + "/") + name;
         public Vector3 GatePosition => transform.TransformPoint(new Vector3(0f, 0f, -size.y * 0.5f));
 
         public void Configure(Vector2 footprint) => size = footprint;
+        public void SetCapacity(int value) => capacity = Mathf.Max(2, value);
 
         public bool Contains(Vector3 worldPosition, float margin = 0f)
         {

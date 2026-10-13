@@ -33,7 +33,7 @@ namespace FarmRestoration
 
         private void OnInteractionSucceeded(FarmTool tool, IInteractable target)
         {
-            if (!(target is FarmPlot plot)) return;
+            if (!(target is FarmPlot) && !(target is ChoppableTree)) return;
             ParticleSystem emitter = pool[nextEmitter++ % PoolSize];
             if (emitter == null) return;
 
@@ -45,10 +45,12 @@ namespace FarmRestoration
                 case FarmTool.Seeds: color = new Color(0.50f, 0.82f, 0.25f); count = 6; break;
                 case FarmTool.WateringCan: color = new Color(0.25f, 0.72f, 1f); count = 13; break;
                 case FarmTool.Harvest: color = new Color(1f, 0.78f, 0.20f); count = 12; break;
+                case FarmTool.Axe: color = new Color(0.65f, 0.40f, 0.16f); count = 12; break;
                 default: return;
             }
 
-            emitter.transform.position = plot.transform.position + Vector3.up * 0.25f;
+            emitter.transform.position = ((MonoBehaviour)target).transform.position
+                + Vector3.up * (target is ChoppableTree ? 1.1f : 0.25f);
             emitter.Clear();
             emitter.Play();
             var parameters = new ParticleSystem.EmitParams { startColor = color };

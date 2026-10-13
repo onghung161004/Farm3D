@@ -18,7 +18,7 @@ namespace FarmRestoration
             source = gameObject.AddComponent<AudioSource>();
             source.playOnAwake = false;
             source.spatialBlend = 0.2f;
-            source.volume = 0.7f;
+            FarmAudioChannel.Bind(source, FarmAudioGroup.Effects, 0.7f);
             splashes = new[]
             {
                 Resources.Load<AudioClip>("FarmAudio/splash_09"),

@@ -127,9 +127,19 @@ namespace FarmRestoration
             return button;
         }
 
-        private void Cast()
+        /// <summary>Mobile ACTION shares the exact destination shown by CAST ROD, not the world raycast.</summary>
+        public static bool TryCastFromAction()
         {
-            if (nearbySpot != null) nearbySpot.TryBeginFromTouch();
+            return instance != null && instance.TryCastShownSpot();
+        }
+
+        private void Cast() => TryCastShownSpot();
+
+        private bool TryCastShownSpot()
+        {
+            if (session != null || FishingSession.IsFishing || nearbySpot == null
+                || castButton == null || !castButton.activeInHierarchy) return false;
+            return nearbySpot.TryBeginFromTouch();
         }
 
         private void Cancel()
