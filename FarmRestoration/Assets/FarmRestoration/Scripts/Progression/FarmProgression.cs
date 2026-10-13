@@ -11,6 +11,7 @@ namespace FarmRestoration
         private const string SaveFile = "FarmDemoSave.json";
         private readonly int[] products = new int[3];
         private readonly bool[] repairs = new bool[2];
+        private readonly bool[] gardenUnlocks = new bool[3];
         private FarmPlot[] plots = Array.Empty<FarmPlot>();
         private CowAnimal[] cows = Array.Empty<CowAnimal>();
         private FarmHud hud;
@@ -62,6 +63,7 @@ namespace FarmRestoration
             ready = true;
             Changed?.Invoke();
             UpdateWorldGardenLabels();
+            VillageWarehouse.EnsurePresent();
         }
 
         private void OnDestroy()
@@ -91,7 +93,56 @@ namespace FarmRestoration
         }
 
         public int ProductCount(CropType type) => products[(int)type];
+        public int StockCount(WarehouseItemKind item)
+        {
+            int index = (int)item;
+            if (index < 0 || index > 6) return 0;
+            if (index < 3) return hud == null ? 0 : hud.CropInventory.GetCount((CropType)index);
+            if (index < 6) return products[index - 3];
+            return milk;
+        }
+
+        public static int SellPrice(WarehouseItemKind item)
+        {
+            int index = (int)item;
+            if (index >= 0 && index < 3) return 2;
+            if (index >= 3 && index < 6) return 15;
+            return index == 6 ? 10 : 0;
+        }
+
+        public bool TrySell(WarehouseItemKind item)
+        {
+            int index = (int)item;
+            int price = SellPrice(item);
+            if (!ready || price == 0 || StockCount(item) < 1) return false;
+            if (index < 3)
+            {
+                inTransaction = true;
+                bool spent = hud.CropInventory.TrySpend((CropType)index, 1);
+                inTransaction = false;
+                if (!spent) return false;
+            }
+            else if (index < 6) products[index - 3]--;
+            else milk--;
+            coins += price;
+            MoneyEarned?.Invoke(price);
+            AnyMoneyEarned?.Invoke(price);
+            FarmAudioFeedback.PlayCoin();
+            NotifyAndSave();
+            return true;
+        }
         public bool IsRepaired(int index) => index >= 0 && index < repairs.Length && repairs[index];
+        public bool IsGardenUnlocked(int index) => index >= 0 && index < gardenUnlocks.Length && gardenUnlocks[index];
+
+        public bool TryUnlockGarden(int index, int price)
+        {
+            if (!ready || index < 0 || index >= gardenUnlocks.Length || gardenUnlocks[index]
+                || price < 0 || coins < price) return false;
+            coins -= price;
+            gardenUnlocks[index] = true;
+            NotifyAndSave();
+            return true;
+        }
 
         public void AddCoins(int amount)
         {
@@ -417,6 +468,23 @@ namespace FarmRestoration
                 return nearest != null ? nearest.TotalReward(DateTime.UtcNow) : 15;
             }
         }
+        public string OrderMissingDescription()
+        {
+            ActiveTimedOrder nearest = GetNearestDeadlineOrder(DateTime.UtcNow);
+            if (nearest == null) return "No active orders";
+            if (nearest.isProduct)
+            {
+                int have = products[(int)nearest.cropType];
+                int missing = nearest.amount - have;
+                return missing <= 0 ? "" : "Need " + missing + " " + ProductName(nearest.cropType);
+            }
+            else
+            {
+                int have = hud != null ? hud.CropInventory.GetCount(nearest.cropType) : 0;
+                int missing = nearest.amount - have;
+                return missing <= 0 ? "" : "Need " + missing + " more " + nearest.cropType;
+            }
+        }
 
         public bool TryRepair(int index, int price)
         {
@@ -448,6 +516,7 @@ namespace FarmRestoration
                 orderIndex = orderIndex,
                 milk = milk,
                 repairs = (bool[])repairs.Clone(),
+                gardenUnlocks = (bool[])gardenUnlocks.Clone(),
                 plots = new PlotSaveData[plots.Length],
                 cows = new CowSaveData[cows.Length],
                 questData = QuestManager.Instance != null ? QuestManager.Instance.ExportSaveData() : null,
@@ -458,7 +527,7 @@ namespace FarmRestoration
             for (int i = 0; i < plots.Length; i++)
             {
                 FarmPlot plot = plots[i];
-                data.plots[i] = new PlotSaveData { id = PlotId(plot), state = (int)plot.CurrentState, readyUtcTicks = plot.GrowthReadyUtcTicks };
+                data.plots[i] = new PlotSaveData { id = PlotId(plot), state = (int)plot.CurrentState, readyUtcTicks = plot.GrowthReadyUtcTicks, cropType = (int)plot.CropType };
             }
             for (int i = 0; i < cows.Length; i++) data.cows[i] = cows[i].Snapshot();
             try
@@ -482,10 +551,12 @@ namespace FarmRestoration
             try
             {
                 FarmSaveData data = JsonUtility.FromJson<FarmSaveData>(File.ReadAllText(SavePath));
-                if (data == null || data.version != 1) throw new InvalidDataException("Unsupported save version");
+                if (data == null || (data.version != 1 && data.version != 2 && data.version != 3)) throw new InvalidDataException("Unsupported save version");
                 hud.CropInventory.Restore(data.crops);
                 for (int i = 0; i < products.Length; i++) products[i] = data.products != null && i < data.products.Length ? Math.Max(0, data.products[i]) : 0;
                 for (int i = 0; i < repairs.Length; i++) repairs[i] = data.repairs != null && i < data.repairs.Length && data.repairs[i];
+                for (int i = 0; i < gardenUnlocks.Length; i++)
+                    gardenUnlocks[i] = data.gardenUnlocks != null && i < data.gardenUnlocks.Length && data.gardenUnlocks[i];
                 coins = Math.Max(0, data.coins);
                 orderIndex = Math.Max(0, data.orderIndex);
                 milk = Math.Max(0, data.milk);
@@ -495,7 +566,10 @@ namespace FarmRestoration
                         if (saved != null && !string.IsNullOrEmpty(saved.id)) savedPlots[saved.id] = saved;
                 foreach (FarmPlot plot in plots)
                     if (savedPlots.TryGetValue(PlotId(plot), out PlotSaveData saved))
+                    {
+                        if (data.version >= 2) plot.ConfigureCropType((CropType)saved.cropType);
                         plot.Restore((FarmPlotState)saved.state, saved.readyUtcTicks, DateTime.UtcNow);
+                    }
                 Dictionary<string, CowSaveData> savedCows = new Dictionary<string, CowSaveData>();
                 if (data.cows != null)
                     foreach (CowSaveData saved in data.cows)
@@ -527,6 +601,7 @@ namespace FarmRestoration
                 hud.CropInventory.Restore(null);
                 Array.Clear(products, 0, products.Length);
                 Array.Clear(repairs, 0, repairs.Length);
+                Array.Clear(gardenUnlocks, 0, gardenUnlocks.Length);
                 coins = 15;
                 orderIndex = 0;
                 milk = 0;

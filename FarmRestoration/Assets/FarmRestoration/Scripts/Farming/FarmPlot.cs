@@ -14,10 +14,15 @@ namespace FarmRestoration
         [SerializeField] private GameObject growingVisual;
         [SerializeField] private GameObject readyToHarvestVisual;
         [SerializeField] private CropType cropType = CropType.Pumpkin;
+        [SerializeField] private int requiredGardenIndex = -1;
 
         public FarmPlotState CurrentState { get; private set; } = FarmPlotState.Untilled;
         public CropType CropType => cropType;
         public long GrowthReadyUtcTicks { get; private set; }
+        public bool IsUnlocked => transform.parent == null
+            || !transform.parent.name.StartsWith("ExpansionGarden", StringComparison.Ordinal)
+            || requiredGardenIndex < 0 || FarmProgression.Instance != null
+            && FarmProgression.Instance.IsGardenUnlocked(requiredGardenIndex);
 
         public event Action<int> Harvested;
         public event Action<CropType, int> CropHarvested;
@@ -25,6 +30,7 @@ namespace FarmRestoration
         public static event Action<CropType> AnyCropPlanted;
         public static event Action<CropType, int> AnyCropHarvested;
         public event Action<FarmPlot> StateChanged;
+        public event Action<CropType> CropTypeChanged;
 
         private int GrowthSeconds => cropType == CropType.Carrot ? 45 : cropType == CropType.Tomato ? 60 : 75;
 
@@ -56,6 +62,7 @@ namespace FarmRestoration
                 return false;
             }
 
+            if (!IsUnlocked) return false;
             if (CurrentState == FarmPlotState.Untilled && tool == FarmTool.Hoe)
             {
                 SetState(FarmPlotState.Tilled);
@@ -72,13 +79,12 @@ namespace FarmRestoration
                 CropPlanted?.Invoke(cropType);
                 AnyCropPlanted?.Invoke(cropType);
                 return true;
+                return TryPlant(cropType);
             }
 
             if (CurrentState == FarmPlotState.Seeded && tool == FarmTool.WateringCan)
             {
-                GrowthReadyUtcTicks = DateTime.UtcNow.AddSeconds(GrowthSeconds).Ticks;
-                SetState(FarmPlotState.Watered);
-                return true;
+                return TryWaterFromRain(DateTime.UtcNow);
             }
 
             if (CurrentState == FarmPlotState.ReadyToHarvest && tool == FarmTool.Harvest)
@@ -94,8 +100,28 @@ namespace FarmRestoration
             return false;
         }
 
+        public bool TryPlant(CropType type)
+        {
+            if (!IsUnlocked) return false;
+            if (CurrentState != FarmPlotState.Tilled || !Enum.IsDefined(typeof(CropType), type)) return false;
+            ConfigureCropType(type);
+            SetState(FarmPlotState.Seeded);
+            return true;
+        }
+
+        /// <summary>Rain uses the same one-time watering transition as the watering can.</summary>
+        public bool TryWaterFromRain(DateTime nowUtc)
+        {
+            if (!IsUnlocked) return false;
+            if (CurrentState != FarmPlotState.Seeded) return false;
+            GrowthReadyUtcTicks = nowUtc.AddSeconds(GrowthSeconds).Ticks;
+            SetState(FarmPlotState.Watered);
+            return true;
+        }
+
         public bool AdvanceGrowth()
         {
+            if (!IsUnlocked) return false;
             if (CurrentState == FarmPlotState.Watered)
             {
                 SetState(FarmPlotState.Growing);
@@ -114,6 +140,7 @@ namespace FarmRestoration
 
         public void TickGrowth(DateTime nowUtc)
         {
+            if (!IsUnlocked) return;
             if (GrowthReadyUtcTicks <= 0 || (CurrentState != FarmPlotState.Watered && CurrentState != FarmPlotState.Growing)) return;
             if (nowUtc.Ticks >= GrowthReadyUtcTicks)
             {
@@ -146,6 +173,7 @@ namespace FarmRestoration
                 return $"[Locked] {cropType} Garden (Unlock: {cost} coins or Quest)";
             }
 
+            if (!IsUnlocked) return "Garden locked: buy this 9-plot area for 30 coins at its sign";
             if (CurrentState == FarmPlotState.Untilled)
             {
                 return tool == FarmTool.Hoe ? "Till soil" : "Select Hoe";
@@ -195,7 +223,14 @@ namespace FarmRestoration
 
         public void ConfigureCropType(CropType type)
         {
+            if (!Enum.IsDefined(typeof(CropType), type) || cropType == type) return;
             cropType = type;
+            CropTypeChanged?.Invoke(type);
+        }
+
+        public void ConfigureRequiredGarden(int index)
+        {
+            requiredGardenIndex = index;
         }
 
         private void SetState(FarmPlotState nextState)

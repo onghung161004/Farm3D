@@ -20,6 +20,11 @@ namespace FarmRestoration
             oldVisual = original;
         }
 
+        public void RebindHouseVisual(GameObject original)
+        {
+            if (repairIndex == 0) oldVisual = original;
+        }
+
         private FarmProgression game;
 
         private void Start()

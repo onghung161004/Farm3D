@@ -69,7 +69,8 @@ namespace FarmRestoration.Tests.EditMode
                 coins = 31,
                 orderIndex = 4,
                 repairs = new[] { true, false },
-                plots = new[] { new PlotSaveData { id = "PumpkinGarden/PumpkinPlot_0", state = (int)FarmPlotState.Watered, readyUtcTicks = 123456789L } }
+                gardenUnlocks = new[] { true, false, true },
+                plots = new[] { new PlotSaveData { id = "PumpkinGarden/PumpkinPlot_0", state = (int)FarmPlotState.Watered, readyUtcTicks = 123456789L, cropType = (int)CropType.Tomato } }
             };
 
             FarmSaveData loaded = UnityEngine.JsonUtility.FromJson<FarmSaveData>(UnityEngine.JsonUtility.ToJson(saved));
@@ -77,7 +78,9 @@ namespace FarmRestoration.Tests.EditMode
             Assert.That(loaded.coins, Is.EqualTo(31));
             Assert.That(loaded.orderIndex, Is.EqualTo(4));
             Assert.That(loaded.plots[0].readyUtcTicks, Is.EqualTo(123456789L));
+            Assert.That(loaded.plots[0].cropType, Is.EqualTo((int)CropType.Tomato));
             Assert.That(loaded.repairs[0], Is.True);
+            Assert.That(loaded.gardenUnlocks, Is.EqualTo(new[] { true, false, true }));
         }
     }
 }

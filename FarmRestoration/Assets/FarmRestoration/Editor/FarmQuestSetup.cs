@@ -192,8 +192,8 @@ namespace FarmRestoration.Editor
             RectTransform rect = (RectTransform)panel.transform;
             rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 1f);
-            rect.anchoredPosition = new Vector2(-18f, -135f);
-            rect.sizeDelta = new Vector2(420f, 150f);
+            rect.anchoredPosition = new Vector2(-18f, -155f);
+            rect.sizeDelta = new Vector2(500f, 180f);
 
             Image background = panel.GetComponent<Image>();
             background.color = new Color(0.06f, 0.12f, 0.14f, 0.94f);
@@ -204,14 +204,18 @@ namespace FarmRestoration.Editor
             RectTransform textRect = (RectTransform)textObject.transform;
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(14f, 8f);
-            textRect.offsetMax = new Vector2(-10f, -7f);
+            textRect.offsetMin = new Vector2(16f, 10f);
+            textRect.offsetMax = new Vector2(-14f, -10f);
 
             TextMeshProUGUI label = textObject.GetComponent<TextMeshProUGUI>();
-            label.fontSize = 16f;
+            label.fontSize = 21f;
+            label.fontStyle = FontStyles.Bold;
+            label.extraPadding = true;
+            label.lineSpacing = 6f;
             label.color = Color.white;
             label.textWrappingMode = TextWrappingModes.Normal;
             label.raycastTarget = false;
+            FarmHud.OptimizeLabelRendering(label, 21f);
 
             QuestTrackerHud tracker = panel.GetComponent<QuestTrackerHud>();
             tracker.Configure(label);

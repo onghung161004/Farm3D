@@ -18,8 +18,9 @@ namespace FarmRestoration.Editor
         private const string MaterialFolder = "Assets/FarmRestoration/Materials/PolytopeNature";
         private const string WalkwayPath = "Assets/FarmRestoration/Models/Generated/PolytopeBridgeWalkway.asset";
         private const string LayerName = "PolytopeNatureEnvironment";
-        private const string FarmSurfaceName = "FarmSurfaceV2";
+        private const string FarmSurfaceName = "FarmSurfaceV5";
         private const string BridgeAlignmentMarker = "BridgeDeckAlignedV3";
+        private const string ImportedRiverMaterial = "Assets/BluBlu Games/Low Poly Forest Mini Pack/Materials/Water.mat";
 
         [InitializeOnLoadMethod]
         private static void ApplyOnceAfterImport()
@@ -47,6 +48,8 @@ namespace FarmRestoration.Editor
                 bool changed = false;
                 if (layer.Find(FarmSurfaceName) == null)
                 {
+                    RemoveChild(layer, "FarmSurfaceV2");
+                    RemoveChild(layer, "FarmSurfaceV3");
                     ApplyFarmSurfaceMaterials(layer);
                     changed = true;
                 }
@@ -56,10 +59,19 @@ namespace FarmRestoration.Editor
                     PlaceBridge(layer);
                     changed = true;
                 }
+                Renderer river = valley.transform.Find("RiverWater")?.GetComponent<Renderer>();
+                Material importedWater = AssetDatabase.LoadAssetAtPath<Material>(ImportedRiverMaterial);
+                if (river != null && importedWater != null && river.sharedMaterial != importedWater)
+                {
+                    river.sharedMaterial = importedWater;
+                    changed = true;
+                }
+                if (ReferenceLandscapeSetup.RefreshRiverShore(valley.transform)) changed = true;
                 if (changed)
                 {
                     EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
                     EditorSceneManager.SaveScene(SceneManager.GetActiveScene());
+                    AssetDatabase.SaveAssets();
                 }
             }
         }
@@ -139,6 +151,12 @@ namespace FarmRestoration.Editor
         {
             Renderer renderer = valley.Find("RiverWater")?.GetComponent<Renderer>();
             if (renderer == null) return;
+            Material importedWater = AssetDatabase.LoadAssetAtPath<Material>(ImportedRiverMaterial);
+            if (importedWater != null)
+            {
+                renderer.sharedMaterial = importedWater;
+                return;
+            }
             Material water = GetMaterial("PT_ClearRiver", null, new Color(0.35f, 0.76f, 0.82f), new Vector2(2f, 8f));
             if (water == null) return;
             Texture2D riverTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(
@@ -280,6 +298,8 @@ namespace FarmRestoration.Editor
                 Vector2 point = new Vector2(x, z);
                 if (point.magnitude < 35f || Vector2.Distance(point, new Vector2(-63f, 51f)) < 24f
                     || ReferenceLandscapeSetup.GroundDistanceToRiver(point) < riverClearance
+                    || FishingPondTerrain.IsNear(point, 5f)
+                    || VillageHouseLayout.IsNearHome(point, forestOnly ? 8f : 5f)
                     || NearPath(point, 5.5f) || (forestOnly && Mathf.Abs(x) < 49f && z < 71f)) continue;
                 float scale = Mathf.Lerp(minScale, maxScale, (float)random.NextDouble());
                 Place(prefab, parent, prefab.name + "_" + i,
@@ -304,9 +324,9 @@ namespace FarmRestoration.Editor
         {
             GameObject fence = AssetDatabase.LoadAssetAtPath<GameObject>(Village + "Fence/PT_Modular_Fence_Wood_01.prefab");
             Transform root = Child(layer, "Fences");
-            FenceLine(fence, root, new Vector2(-95f, 35f), new Vector2(-95f, 80f), 18);
-            FenceLine(fence, root, new Vector2(-44f, 55f), new Vector2(-44f, 80f), 10);
-            FenceLine(fence, root, new Vector2(-95f, 85f), new Vector2(-50f, 85f), 18);
+            FenceLine(fence, root, new Vector2(-97f, 32f), new Vector2(-97f, 89f), 22);
+            FenceLine(fence, root, new Vector2(-38f, 56f), new Vector2(-38f, 86f), 12);
+            FenceLine(fence, root, new Vector2(-97f, 94f), new Vector2(-40f, 94f), 22);
         }
 
         internal static void RefreshVillageFences(Transform valley)
@@ -332,24 +352,39 @@ namespace FarmRestoration.Editor
         private static void ApplyFarmSurfaceMaterials(Transform layer)
         {
             EnsureMaterialFolder();
-            Transform farmSurface = Child(layer, FarmSurfaceName);
+            Child(layer, FarmSurfaceName);
             Material grass = GetMaterial("PT_FarmPlotGrass", "PT_Ground_Grass_Green_01.png",
                 new Color(0.94f, 1f, 0.92f), Vector2.one);
             Material drySoil = GetMaterial("PT_FarmDrySoil", "PT_Ground_Generic_03.png",
                 new Color(0.72f, 0.49f, 0.31f), Vector2.one);
             Material wetSoil = GetMaterial("PT_FarmWetSoil", "PT_Ground_Generic_03.png",
                 new Color(0.37f, 0.32f, 0.28f), Vector2.one);
+            Material softSoil = GetSoftGardenSoilMaterial();
+            if (softSoil == null) RemoveChild(layer, FarmSurfaceName);
             Transform cropGardens = GameObject.Find("CropGardens")?.transform;
             if (cropGardens != null)
             {
-                foreach (FarmPlot plot in cropGardens.GetComponentsInChildren<FarmPlot>(true))
+                foreach (GardenSoilSurface oldSurface in cropGardens.GetComponentsInChildren<GardenSoilSurface>(true))
+                    if (oldSurface.transform != cropGardens) UnityEngine.Object.DestroyImmediate(oldSurface);
+                if (softSoil != null)
                 {
-                    SetPlotGround(plot.transform, "UntilledVisual", grass);
-                    SetPlotGround(plot.transform, "TilledVisual", drySoil);
-                    SetPlotGround(plot.transform, "SeededVisual", drySoil);
-                    SetPlotGround(plot.transform, "WateredVisual", wetSoil);
-                    SetPlotGround(plot.transform, "GrowingVisual", drySoil);
-                    SetPlotGround(plot.transform, "ReadyToHarvestVisual", drySoil);
+                    GardenSoilSurface surface = cropGardens.GetComponent<GardenSoilSurface>();
+                    if (surface == null) surface = cropGardens.gameObject.AddComponent<GardenSoilSurface>();
+                    surface.Configure(softSoil);
+                }
+                foreach (Transform garden in cropGardens)
+                {
+                    FarmPlot[] plots = garden.GetComponentsInChildren<FarmPlot>(true);
+                    if (plots.Length == 0) continue;
+                    foreach (FarmPlot plot in plots)
+                    {
+                        SetPlotGround(plot.transform, "UntilledVisual", grass, softSoil != null);
+                        SetPlotGround(plot.transform, "TilledVisual", drySoil, softSoil != null);
+                        SetPlotGround(plot.transform, "SeededVisual", drySoil, softSoil != null);
+                        SetPlotGround(plot.transform, "WateredVisual", wetSoil, softSoil != null);
+                        SetPlotGround(plot.transform, "GrowingVisual", drySoil, softSoil != null);
+                        SetPlotGround(plot.transform, "ReadyToHarvestVisual", drySoil, softSoil != null);
+                    }
                 }
             }
             string[] farmBeds = { "ActiveFieldCenter/PumpkinField", "ActiveFieldCenter/VegetableBeds",
@@ -363,18 +398,38 @@ namespace FarmRestoration.Editor
             Transform oldEntrance = GameObject.Find("LiteFarmPackArt")?.transform.Find("WarmDirtEntrance");
             if (oldEntrance != null) oldEntrance.gameObject.SetActive(false);
 
-            CreateFarmPad(farmSurface, "PumpkinSoilPad", new Vector2(CoherentFarmsteadSetup.PumpkinCenter.x, CoherentFarmsteadSetup.PumpkinCenter.z), drySoil);
-            CreateFarmPad(farmSurface, "CarrotSoilPad", new Vector2(CoherentFarmsteadSetup.CarrotCenter.x, CoherentFarmsteadSetup.CarrotCenter.z), drySoil);
-            CreateFarmPad(farmSurface, "TomatoSoilPad", new Vector2(CoherentFarmsteadSetup.TomatoCenter.x, CoherentFarmsteadSetup.TomatoCenter.z), drySoil);
         }
 
         internal static void RefreshFarmSurfaceMaterials(Transform valley)
         {
             Transform layer = valley?.Find(LayerName);
             if (layer == null) return;
+            RemoveChild(layer, "FarmSurfaceV2");
+            RemoveChild(layer, "FarmSurfaceV3");
+            RemoveChild(layer, "FarmSurfaceV4");
             RemoveChild(layer, FarmSurfaceName);
             ApplyFarmSurfaceMaterials(layer);
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+        }
+
+        [MenuItem("Tools/Farm Restoration/Refresh Seamless Garden Soil")]
+        private static void RefreshGardenSoilInScene()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            if (EditorApplication.isPlayingOrWillChangePlaymode || scene.path != ScenePath)
+            {
+                Debug.LogWarning("Open FarmDemo in Edit Mode before refreshing the garden soil.");
+                return;
+            }
+            Transform valley = GameObject.Find("IllustratedValleyMap")?.transform;
+            if (valley == null || valley.Find(LayerName) == null)
+            {
+                Debug.LogWarning("The illustrated valley or Polytope environment is missing; garden soil was not changed.");
+                return;
+            }
+            RefreshFarmSurfaceMaterials(valley);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
         }
 
         internal static Material FarmDirtMaterial()
@@ -391,23 +446,36 @@ namespace FarmRestoration.Editor
                 new Color(0.86f, 0.73f, 0.53f), new Vector2(1f, 8f));
         }
 
-        private static void SetPlotGround(Transform plot, string stateName, Material material)
+        private static void SetPlotGround(Transform plot, string stateName, Material material, bool useSoftSoil)
         {
             Renderer renderer = plot.Find(stateName + "/Ground")?.GetComponent<Renderer>();
-            if (renderer != null && material != null) renderer.sharedMaterial = material;
+            if (renderer == null) return;
+            if (material != null) renderer.sharedMaterial = material;
+            // The soft mesh draws every cultivated state; the old cube keeps its gameplay root only.
+            renderer.enabled = !useSoftSoil && stateName != "UntilledVisual";
         }
 
-        private static void CreateFarmPad(Transform parent, string name, Vector2 center, Material material)
+        private static Material GetSoftGardenSoilMaterial()
         {
-            GameObject pad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            pad.name = name;
-            pad.transform.SetParent(parent, false);
-            pad.transform.localPosition = new Vector3(center.x, 0.045f, center.y);
-            pad.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
-            pad.transform.localScale = new Vector3(5.15f, 5.15f, 1f);
-            Collider collider = pad.GetComponent<Collider>();
-            if (collider != null) UnityEngine.Object.DestroyImmediate(collider);
-            pad.GetComponent<Renderer>().sharedMaterial = material;
+            Shader shader = Shader.Find("FarmRestoration/SoftGardenSoil");
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(Textures + "PT_Ground_Generic_03.png");
+            if (shader == null || texture == null)
+            {
+                Debug.LogWarning("Soft garden soil shader or texture is unavailable; keeping the existing soil tiles.");
+                return null;
+            }
+            string path = MaterialFolder + "/PT_SoftGardenSoil.mat";
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(shader);
+                AssetDatabase.CreateAsset(material, path);
+            }
+            material.shader = shader;
+            material.SetTexture("_BaseMap", texture);
+            material.SetColor("_BaseColor", new Color(0.73f, 0.62f, 0.49f, 1f));
+            EditorUtility.SetDirty(material);
+            return material;
         }
 
         private static void FenceLine(GameObject prefab, Transform parent, Vector2 a, Vector2 b, int count)

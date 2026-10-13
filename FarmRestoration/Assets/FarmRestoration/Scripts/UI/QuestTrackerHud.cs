@@ -11,6 +11,11 @@ namespace FarmRestoration
         public void Configure(TextMeshProUGUI label)
         {
             trackerText = label;
+            if (trackerText != null)
+            {
+                FarmHud.OptimizeLabelRendering(trackerText, 21f);
+                trackerText.lineSpacing = 6f;
+            }
             RefreshDisplay();
         }
 
@@ -19,6 +24,11 @@ namespace FarmRestoration
             if (trackerText == null)
             {
                 trackerText = GetComponentInChildren<TextMeshProUGUI>();
+            }
+            if (trackerText != null)
+            {
+                FarmHud.OptimizeLabelRendering(trackerText, 21f);
+                trackerText.lineSpacing = 6f;
             }
 
             if (QuestManager.Instance != null)

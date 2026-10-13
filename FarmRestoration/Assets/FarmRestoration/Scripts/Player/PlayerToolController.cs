@@ -32,9 +32,11 @@ namespace FarmRestoration
         private bool batchStarted;
 
         public FarmTool SelectedTool { get; private set; } = FarmTool.Hoe;
+        public CropType SelectedCropType { get; private set; } = CropType.Pumpkin;
         public string CurrentPrompt => currentPrompt;
 
         public event Action<FarmTool> SelectedToolChanged;
+        public event Action<CropType> SelectedCropChanged;
         public event Action<FarmTool> ToolUsedSuccessfully;
         public event Action<FarmTool, IInteractable> InteractionSucceeded;
         public event Action<string> InteractionPromptChanged;
@@ -57,6 +59,8 @@ namespace FarmRestoration
         {
             HandleToolSelectionInput();
             UpdateInteractionPrompt();
+
+            if (VillageOrderDialogue.IsOpen || FarmWarehouseView.IsOpen || VillageResidentDialogue.IsOpen) return;
 
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null) HandleInteractKey(keyboard);
@@ -136,7 +140,7 @@ namespace FarmRestoration
         private void UsePlot(FarmPlot plot)
         {
             if (plot == null || !plot.isActiveAndEnabled) return;
-            if (PlayerToolInteraction.TryUse(plot, heldTool)) PublishSuccessfulInteraction(heldTool, plot);
+            if (TryUseOnTarget(plot, heldTool)) PublishSuccessfulInteraction(heldTool, plot);
             UpdateInteractionPrompt();
         }
 
@@ -167,6 +171,22 @@ namespace FarmRestoration
             }
         }
 
+        public void SelectCrop(CropType crop)
+        {
+            if (!Enum.IsDefined(typeof(CropType), crop)) return;
+            CancelHeldGarden();
+            SelectedCropType = crop;
+            SelectedCropChanged?.Invoke(crop);
+            SetSelectedTool(FarmTool.Seeds);
+            UpdateInteractionPrompt();
+        }
+
+        private bool TryUseOnTarget(IInteractable target, FarmTool tool)
+        {
+            return target is FarmPlot plot && tool == FarmTool.Seeds
+                ? plot.TryPlant(SelectedCropType) : PlayerToolInteraction.TryUse(target, tool);
+        }
+
         public bool TryUseTool()
         {
             if (!TryFindTarget(out IInteractable target))
@@ -174,7 +194,7 @@ namespace FarmRestoration
                 return false;
             }
 
-            bool didInteract = PlayerToolInteraction.TryUse(target, SelectedTool);
+            bool didInteract = TryUseOnTarget(target, SelectedTool);
             if (didInteract)
             {
                 PublishSuccessfulInteraction(SelectedTool, target);
@@ -225,6 +245,9 @@ namespace FarmRestoration
             {
                 SelectTool(4);
             }
+            else if (keyboard.digit5Key.wasPressedThisFrame) SelectCrop(CropType.Pumpkin);
+            else if (keyboard.digit6Key.wasPressedThisFrame) SelectCrop(CropType.Carrot);
+            else if (keyboard.digit7Key.wasPressedThisFrame) SelectCrop(CropType.Tomato);
         }
 
         private void SetSelectedTool(FarmTool nextTool)
@@ -252,6 +275,8 @@ namespace FarmRestoration
             string nextPrompt = target == null ? NoTargetPrompt : target.GetInteractionPrompt(SelectedTool);
             if (target is FarmPlot plot && FarmGardenBatch.IsGardenPlot(plot) && (FarmProgression.Instance == null || FarmProgression.Instance.IsGardenUnlocked(plot.CropType)))
                 nextPrompt += "  |  Hold E: all 9 plots";
+            if (target is FarmPlot && SelectedTool == FarmTool.Seeds)
+                nextPrompt += "  |  " + SelectedCropType + " (5/6/7)";
             if (ReferenceEquals(currentTarget, target) && currentPrompt == nextPrompt)
             {
                 return;

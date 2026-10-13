@@ -29,10 +29,45 @@ namespace FarmRestoration
 
         private void OnEnable()
         {
+            EnsureCropSelectionButtons();
             ConfigureTextRendering();
             Subscribe();
             cropInventory.Changed += OnCropInventoryChanged;
             Refresh();
+        }
+
+        private void EnsureCropSelectionButtons()
+        {
+            if (toolController == null || cropSlotCounts == null) return;
+            for (int i = 0; i < cropSlotCounts.Length && i < 3; i++)
+            {
+                TMP_Text count = cropSlotCounts[i];
+                if (count == null) continue;
+                Image frame = count.transform.parent.GetComponent<Image>();
+                if (frame == null) continue;
+                frame.raycastTarget = true;
+                HotbarToolButton button = frame.GetComponent<HotbarToolButton>();
+                if (button == null) button = frame.gameObject.AddComponent<HotbarToolButton>();
+                button.Configure(toolController, i + 5);
+                Transform shortcut = frame.transform.Find("Shortcut");
+                if (shortcut == null)
+                {
+                    GameObject label = new GameObject("Shortcut", typeof(RectTransform), typeof(TextMeshProUGUI));
+                    label.transform.SetParent(frame.transform, false);
+                    RectTransform rect = label.GetComponent<RectTransform>();
+                    rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+                    rect.pivot = new Vector2(0f, 1f);
+                    rect.anchoredPosition = new Vector2(8f, -5f);
+                    rect.sizeDelta = new Vector2(25f, 22f);
+                    TextMeshProUGUI text = label.GetComponent<TextMeshProUGUI>();
+                    text.text = (i + 5).ToString();
+                    text.fontSize = 20f;
+                    text.fontStyle = FontStyles.Bold;
+                    text.extraPadding = true;
+                    text.color = new Color(1f, 0.83f, 0.36f);
+                    text.raycastTarget = false;
+                }
+            }
         }
 
         private void OnDisable()
@@ -43,20 +78,32 @@ namespace FarmRestoration
 
         private void OnCropInventoryChanged(CropType type, int count) => SetCropSummary();
 
+        public static void OptimizeLabelRendering(TMP_Text label, float minimumFontSize = 20f)
+        {
+            if (label == null) return;
+            label.extraPadding = true;
+            if (label.fontSize < minimumFontSize)
+            {
+                label.fontSize = minimumFontSize;
+            }
+            label.fontStyle |= FontStyles.Bold;
+            Material material = label.fontSharedMaterial;
+            if (material != null && material.HasProperty(SharpnessProperty))
+            {
+                material.SetFloat(SharpnessProperty, 0f);
+            }
+            label.SetMaterialDirty();
+        }
+
         private void ConfigureTextRendering()
         {
             Canvas canvas = GetComponent<Canvas>();
-            if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
-                canvas.pixelPerfect = true;
+            if (canvas != null)
+                canvas.pixelPerfect = false;
 
             foreach (TextMeshProUGUI label in GetComponentsInChildren<TextMeshProUGUI>(true))
             {
-                Material material = label.fontMaterial;
-                if (material == null) continue;
-                if (material.HasProperty(SharpnessProperty)) material.SetFloat(SharpnessProperty, 0.65f);
-                if (material.HasProperty(OutlineWidthProperty))
-                    material.SetFloat(OutlineWidthProperty, Mathf.Min(material.GetFloat(OutlineWidthProperty), 0.06f));
-                label.SetMaterialDirty();
+                OptimizeLabelRendering(label, 20f);
             }
         }
 
@@ -92,6 +139,7 @@ namespace FarmRestoration
             if (toolController != null)
             {
                 SetTool(toolController.SelectedTool);
+                SetCropSelection(toolController.SelectedCropType);
                 SetPrompt(toolController.CurrentPrompt);
             }
             else
@@ -113,6 +161,7 @@ namespace FarmRestoration
             if (toolController != null)
             {
                 toolController.SelectedToolChanged += SetTool;
+                toolController.SelectedCropChanged += SetCropSelection;
                 toolController.InteractionPromptChanged += SetPrompt;
             }
 
@@ -135,6 +184,7 @@ namespace FarmRestoration
             if (toolController != null)
             {
                 toolController.SelectedToolChanged -= SetTool;
+                toolController.SelectedCropChanged -= SetCropSelection;
                 toolController.InteractionPromptChanged -= SetPrompt;
             }
 
@@ -152,6 +202,7 @@ namespace FarmRestoration
 
         private void SetTool(FarmTool tool)
         {
+            if (toolController != null) SetCropSelection(toolController.SelectedCropType);
             if (toolLabel != null)
             {
                 toolLabel.text = FarmHudPresentation.ToolText(tool);
@@ -172,6 +223,18 @@ namespace FarmRestoration
             if (promptLabel != null)
             {
                 promptLabel.text = FarmHudPresentation.PromptText(prompt);
+            }
+        }
+
+        private void SetCropSelection(CropType crop)
+        {
+            if (cropSlotCounts == null || toolController == null) return;
+            for (int i = 0; i < cropSlotCounts.Length && i < 3; i++)
+            {
+                Image frame = cropSlotCounts[i] == null ? null : cropSlotCounts[i].transform.parent.GetComponent<Image>();
+                if (frame == null) continue;
+                bool selected = toolController.SelectedTool == FarmTool.Seeds && i == (int)crop;
+                frame.color = selected ? new Color(0.45f, 0.82f, 0.36f, 1f) : new Color(0.20f, 0.27f, 0.29f, 0.96f);
             }
         }
 

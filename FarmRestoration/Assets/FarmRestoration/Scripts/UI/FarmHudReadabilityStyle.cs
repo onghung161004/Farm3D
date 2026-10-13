@@ -11,9 +11,9 @@ namespace FarmRestoration
         public const float LabelWidth = 980f;
 
         public float ToolFontSize => 52f;
-        public float ActionFontSize => 32f;
-        public float CropsFontSize => 30f;
-        public float ControlsFontSize => 25f;
+        public float ActionFontSize => 36f;
+        public float CropsFontSize => 34f;
+        public float ControlsFontSize => 28f;
 
         public string ControlsText => "1 Hoe    2 Seeds    3 Water\n4 Harvest    E Interact";
 

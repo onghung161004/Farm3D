@@ -16,7 +16,9 @@ namespace FarmRestoration
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (controller != null) controller.SelectTool(shortcutIndex);
+            if (controller == null) return;
+            if (shortcutIndex >= 5 && shortcutIndex <= 7) controller.SelectCrop((CropType)(shortcutIndex - 5));
+            else controller.SelectTool(shortcutIndex);
         }
     }
 }

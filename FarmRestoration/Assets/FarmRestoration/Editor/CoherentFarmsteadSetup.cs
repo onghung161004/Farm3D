@@ -15,9 +15,9 @@ namespace FarmRestoration.Editor
         private const string PackFence = "Assets/Polytope Studio/Lowpoly_Village/Prefabs/Modular/Fence/PT_Modular_Fence_Wood_01.prefab";
         private const string MeshFolder = "Assets/FarmRestoration/Models/Generated/";
 
-        internal static readonly Vector3 PumpkinCenter = new Vector3(-10f, 0.08f, 0f);
+        internal static readonly Vector3 PumpkinCenter = new Vector3(8f, 0.08f, -0.75f);
         internal static readonly Vector3 CarrotCenter = new Vector3(8f, 0.08f, 3f);
-        internal static readonly Vector3 TomatoCenter = new Vector3(8f, 0.08f, 14f);
+        internal static readonly Vector3 TomatoCenter = new Vector3(8f, 0.08f, 6.75f);
 
         [InitializeOnLoadMethod]
         private static void ScheduleUpgrade()
@@ -85,6 +85,7 @@ namespace FarmRestoration.Editor
             BuildOrchard(root);
             BuildFences(root);
             PolytopeNatureSetup.ConvertPackMaterials(root);
+            ApplyWoodFenceMaterial(root.Find("FarmWoodFences"));
             PolytopeNatureSetup.RefreshFarmSurfaceMaterials(valley);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -92,6 +93,26 @@ namespace FarmRestoration.Editor
             Selection.activeGameObject = root.gameObject;
             Debug.Log("Farmstead rebuilt along the valley road. Old ranch cluster removed; 27 interactive plots retained.", root.gameObject);
             return true;
+        }
+
+        internal static void RefreshGardenApproach(Scene scene)
+        {
+            Transform root = FindRoot(scene, "IllustratedValleyMap")?.transform.Find(RootName);
+            if (root == null) return;
+            RemoveChild(root, "FarmTrails");
+            RemoveChild(root, "FarmWoodFences");
+            BuildTrails(root, PolytopeNatureSetup.PathMaterial());
+            BuildFences(root);
+            ApplyWoodFenceMaterial(root.Find("FarmWoodFences"));
+            EditorSceneManager.MarkSceneDirty(scene);
+        }
+
+        private static void ApplyWoodFenceMaterial(Transform fences)
+        {
+            if (fences == null) return;
+            Material wood = CropGardenSetup.WoodFenceMaterial();
+            foreach (Renderer renderer in fences.GetComponentsInChildren<Renderer>(true))
+                renderer.sharedMaterial = wood;
         }
 
         private static void MoveGarden(Transform garden, Vector3 target)
@@ -117,12 +138,10 @@ namespace FarmRestoration.Editor
             Transform trails = Child(parent, "FarmTrails");
             Trail(trails, "MainFarmTrail", new[] { new Vector2(0f, -15f), new Vector2(0f, -7f),
                 new Vector2(-1f, 3f), new Vector2(-6f, 14f), new Vector2(-20f, 24f) }, 2.6f, material);
-            Trail(trails, "PumpkinBranch", new[] { new Vector2(-0.5f, -2f), new Vector2(-6f, -1f),
-                new Vector2(-10f, 0f) }, 1.7f, material);
-            Trail(trails, "CarrotBranch", new[] { new Vector2(-1f, 3f), new Vector2(4f, 3f),
-                new Vector2(8f, 3f) }, 1.7f, material);
-            Trail(trails, "TomatoBranch", new[] { new Vector2(-6f, 14f), new Vector2(0f, 14f),
-                new Vector2(8f, 14f) }, 1.7f, material);
+            Trail(trails, "SharedGardenBranch", new[] { new Vector2(-1f, 3f), new Vector2(2f, 3f),
+                new Vector2(4.6f, 3f) }, 1.7f, material);
+            Trail(trails, "ExpansionGardenBranch", new[] { new Vector2(0f, -11f), new Vector2(2f, -11f),
+                new Vector2(4.6f, -10.75f) }, 1.7f, material);
             Trail(trails, "HouseBranch", new[] { new Vector2(-6f, 14f), new Vector2(-12f, 11f),
                 new Vector2(-17f, 10f) }, 1.7f, material);
         }
@@ -215,7 +234,6 @@ namespace FarmRestoration.Editor
             FenceLine(prefab, fences, new Vector2(-29f, -3f), new Vector2(-29f, 19f), 10);
             FenceLine(prefab, fences, new Vector2(24f, -5f), new Vector2(24f, 19f), 10);
             FenceLine(prefab, fences, new Vector2(-15f, -3f), new Vector2(-15f, 3f), 3);
-            FenceLine(prefab, fences, new Vector2(13f, 0f), new Vector2(13f, 6f), 3);
             FenceLine(prefab, fences, new Vector2(5f, 19f), new Vector2(11f, 19f), 3);
         }
 

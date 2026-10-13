@@ -9,10 +9,24 @@ namespace FarmRestoration
         [SerializeField] private TMP_Text label;
         private FarmProgression game;
 
-        public void Configure(TMP_Text text) { label = text; Refresh(); }
+        public void Configure(TMP_Text text)
+        {
+            label = text;
+            if (label != null)
+            {
+                FarmHud.OptimizeLabelRendering(label, 22f);
+                label.lineSpacing = 6f;
+            }
+            Refresh();
+        }
 
         private void Start()
         {
+            if (label != null)
+            {
+                FarmHud.OptimizeLabelRendering(label, 22f);
+                label.lineSpacing = 6f;
+            }
             game = FarmProgression.Instance;
             if (game != null) game.Changed += Refresh;
             Refresh();
@@ -34,8 +48,17 @@ namespace FarmRestoration
         {
             if (label == null) return;
             FarmProgression state = game != null ? game : FarmProgression.Instance;
-            label.text = state == null ? "Village loading..."
-                : "COINS  " + state.Coins + "  MILK " + state.MilkCount
+            if (state == null)
+            {
+                label.text = "Village loading...";
+                return;
+            }
+
+            string seedText = state.SeedInventory != null
+                ? $"  SEEDS C:{state.SeedInventory.GetCount(CropType.Carrot)} P:{state.SeedInventory.GetCount(CropType.Pumpkin)} T:{state.SeedInventory.GetCount(CropType.Tomato)}"
+                : "";
+
+            label.text = "COINS  " + state.Coins + "  MILK " + state.MilkCount + seedText
                 + "\nSoup " + state.ProductCount(CropType.Pumpkin)
                 + "  Juice " + state.ProductCount(CropType.Carrot)
                 + "  Sauce " + state.ProductCount(CropType.Tomato)
