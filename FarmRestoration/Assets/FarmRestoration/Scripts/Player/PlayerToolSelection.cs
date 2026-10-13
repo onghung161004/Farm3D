@@ -18,6 +18,9 @@ namespace FarmRestoration
                 case 4:
                     tool = FarmTool.Harvest;
                     return true;
+                case 8:
+                    tool = FarmTool.Axe;
+                    return true;
                 default:
                     tool = FarmTool.Hoe;
                     return false;

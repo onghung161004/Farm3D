@@ -23,11 +23,34 @@ namespace FarmRestoration
             if (!TryGround(ground, bridge, approach, waterline, player, cow, out approach)
                 || !TryGround(ground, bridge, inside, waterline, player, cow, out inside))
                 return System.Array.Empty<Vector3>();
+            Vector3[] path = FindTo(start, approach, ground, river, player, cow, bridge);
+            if (path.Length < 2) return System.Array.Empty<Vector3>();
+            List<Vector3> result = new List<Vector3>(path) { groundedGate, inside };
+            return result.ToArray();
+        }
+
+        /// <summary>Finds a ground route to any destination, ignoring the player and target colliders.</summary>
+        public static Vector3[] FindTo(Vector3 start, Vector3 approach, MeshCollider ground,
+            MeshFilter river, Transform player, Transform cow, MeshCollider bridge = null)
+        {
+            if (ground == null) return System.Array.Empty<Vector3>();
+            Vector2[] waterline = GetRiverCenterline(river);
+            if (!TryGround(ground, bridge, approach, waterline, player, cow, out approach))
+                return System.Array.Empty<Vector3>();
             if (!TryGround(ground, bridge, start, waterline, player, cow, out Vector3 groundedStart))
                 groundedStart = start + Vector3.up * 0.35f;
 
             if (ClearSegment(groundedStart, approach, ground, bridge, waterline, player, cow))
-                return new[] { groundedStart, approach, groundedGate, inside };
+            {
+                // Sample the surface even on a clear route so the line follows hills instead of cutting through them.
+                int samples = Mathf.Max(1, Mathf.CeilToInt(Vector3.Distance(groundedStart, approach) / 0.8f));
+                Vector3[] direct = new Vector3[samples + 1];
+                direct[0] = groundedStart;
+                for (int i = 1; i <= samples; i++)
+                    TryGround(ground, bridge, Vector3.Lerp(groundedStart, approach, i / (float)samples),
+                        waterline, player, cow, out direct[i]);
+                return direct;
+            }
 
             float minX = Mathf.Min(start.x, approach.x) - Margin;
             float minZ = Mathf.Min(start.z, approach.z) - Margin;
@@ -97,8 +120,6 @@ namespace FarmRestoration
                 route.Add(positions[index]);
             route.Add(groundedStart);
             route.Reverse();
-            route.Add(groundedGate);
-            route.Add(inside);
             return route.ToArray();
 
             bool Walkable(int index)

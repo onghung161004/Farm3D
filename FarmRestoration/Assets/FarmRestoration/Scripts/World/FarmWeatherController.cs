@@ -11,6 +11,7 @@ namespace FarmRestoration.World
 
         private FarmPlot[] plots = Array.Empty<FarmPlot>();
         private float phaseSeconds;
+        private const float TransitionTolerance = 0.000001f;
 
         public FarmWeatherKind CurrentWeather { get; private set; } = FarmWeatherKind.Clear;
         public event Action<FarmWeatherKind> WeatherChanged;
@@ -40,6 +41,10 @@ namespace FarmRestoration.World
         {
             if (seconds <= 0f || float.IsNaN(seconds) || float.IsInfinity(seconds)) return;
 
+            // A crop can be planted after rain starts. Recheck throughout the rainy phase;
+            // TryWaterFromRain only accepts Seeded, so existing growth deadlines are untouched.
+            if (CurrentWeather == FarmWeatherKind.Rain) WaterSeededPlots(nowUtc);
+
             float clear = Mathf.Max(1f, clearDurationSeconds);
             float rain = Mathf.Max(1f, rainDurationSeconds);
             float remaining = seconds;
@@ -52,13 +57,13 @@ namespace FarmRestoration.World
             {
                 float duration = CurrentWeather == FarmWeatherKind.Clear ? clear : rain;
                 float untilNext = duration - phaseSeconds;
-                if (remaining < untilNext)
+                if (remaining + TransitionTolerance < untilNext)
                 {
                     phaseSeconds += remaining;
                     return;
                 }
 
-                remaining -= untilNext;
+                remaining = Mathf.Max(0f, remaining - untilNext);
                 phaseSeconds = 0f;
                 CurrentWeather = CurrentWeather == FarmWeatherKind.Clear
                     ? FarmWeatherKind.Rain : FarmWeatherKind.Clear;

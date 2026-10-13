@@ -64,7 +64,7 @@ namespace FarmRestoration
             HandleToolSelectionInput();
             UpdateInteractionPrompt();
 
-            if (VillageOrderDialogue.IsOpen || FarmWarehouseView.IsOpen || VillageResidentDialogue.IsOpen)
+            if (VillageOrderDialogue.IsOpen || FarmWarehouseView.IsOpen || VillageResidentDialogue.IsOpen || FarmQuestView.IsOpen || FarmAudioSettingsView.IsOpen)
             {
                 CancelHeldGarden();
                 ClearMobileInteract();
@@ -87,6 +87,13 @@ namespace FarmRestoration
 
         public void SetMobileInteractHeld(bool held)
         {
+            if (FarmQuestView.IsOpen || FarmAudioSettingsView.IsOpen) { CancelHeldGarden(); ClearMobileInteract(); return; }
+            if (held && !mobileInteractHeld && FishingHud.TryCastFromAction())
+            {
+                CancelHeldGarden();
+                ClearMobileInteract();
+                return;
+            }
             if (held && !mobileInteractHeld) mobileInteractPressed = true;
             if (!held && mobileInteractHeld) mobileInteractReleased = true;
             mobileInteractHeld = held;
@@ -95,7 +102,7 @@ namespace FarmRestoration
         public bool TryCycleRecipe()
         {
             if (FishingSession.IsFishing || VillageOrderDialogue.IsOpen || FarmWarehouseView.IsOpen
-                || VillageResidentDialogue.IsOpen) return false;
+                || VillageResidentDialogue.IsOpen || FarmQuestView.IsOpen || FarmAudioSettingsView.IsOpen) return false;
             bool changed = TryFindTarget(out IInteractable target)
                 && target is FarmProductionStation station && station.CycleRecipe();
             if (changed) UpdateInteractionPrompt();
@@ -198,6 +205,7 @@ namespace FarmRestoration
 
         public void SelectTool(int shortcutIndex)
         {
+            if (FarmQuestView.IsOpen || FarmAudioSettingsView.IsOpen) return;
             if (PlayerToolSelection.TryGetTool(shortcutIndex, out FarmTool nextTool))
             {
                 SetSelectedTool(nextTool);
@@ -206,6 +214,7 @@ namespace FarmRestoration
 
         public void SelectCrop(CropType crop)
         {
+            if (FarmQuestView.IsOpen || FarmAudioSettingsView.IsOpen) return;
             if (!Enum.IsDefined(typeof(CropType), crop)) return;
             CancelHeldGarden();
             SelectedCropType = crop;
@@ -222,6 +231,7 @@ namespace FarmRestoration
 
         public bool TryUseTool()
         {
+            if (FarmQuestView.IsOpen || FarmAudioSettingsView.IsOpen) return false;
             if (!TryFindTarget(out IInteractable target))
             {
                 return false;
@@ -281,6 +291,7 @@ namespace FarmRestoration
             else if (keyboard.digit5Key.wasPressedThisFrame) SelectCrop(CropType.Pumpkin);
             else if (keyboard.digit6Key.wasPressedThisFrame) SelectCrop(CropType.Carrot);
             else if (keyboard.digit7Key.wasPressedThisFrame) SelectCrop(CropType.Tomato);
+            else if (keyboard.digit8Key.wasPressedThisFrame) SelectTool(8);
         }
 
         private void SetSelectedTool(FarmTool nextTool)
@@ -305,7 +316,8 @@ namespace FarmRestoration
         private void UpdateInteractionPrompt()
         {
             IInteractable target = TryFindTarget(out IInteractable foundTarget) ? foundTarget : null;
-            string nextPrompt = target == null ? NoTargetPrompt : target.GetInteractionPrompt(SelectedTool);
+            string nextPrompt = target != null ? target.GetInteractionPrompt(SelectedTool)
+                : SelectedTool == FarmTool.Axe ? "Axe: find a marked wood tree in the forest" : NoTargetPrompt;
             if (target is FarmPlot plot && FarmGardenBatch.IsGardenPlot(plot))
                 nextPrompt += "  |  Hold E: all 9 plots";
             if (target is FarmPlot && SelectedTool == FarmTool.Seeds)

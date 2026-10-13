@@ -10,7 +10,7 @@ namespace FarmRestoration
     {
         private static readonly string[] Names =
         {
-            "Pumpkin", "Carrot", "Tomato", "Pumpkin soup", "Carrot juice", "Tomato sauce", "Milk", "Fish"
+            "Pumpkin", "Carrot", "Tomato", "Pumpkin soup", "Carrot juice", "Tomato sauce", "Milk", "Fish", "Wood"
         };
         private static FarmWarehouseView instance;
         private TMP_Text summary;
@@ -38,20 +38,20 @@ namespace FarmRestoration
             panel.transform.SetParent(canvas.transform, false);
             RectTransform rect = (RectTransform)panel.transform;
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(490f, 500f);
+            rect.sizeDelta = new Vector2(490f, 540f);
             panel.GetComponent<Image>().color = new Color(0.055f, 0.11f, 0.13f, 0.98f);
             FarmWarehouseView view = panel.GetComponent<FarmWarehouseView>();
-            view.summary = CreateText(panel.transform, "Summary", new Vector2(0f, 200f), new Vector2(455f, 72f), 18f);
+            view.summary = CreateText(panel.transform, "Summary", new Vector2(0f, 220f), new Vector2(455f, 72f), 18f);
             view.rows = new TMP_Text[Names.Length];
             for (int i = 0; i < Names.Length; i++)
             {
                 int itemIndex = i;
-                Button button = CreateButton(panel.transform, "Item" + i, new Vector2(0f, 137f - i * 40f), new Vector2(450f, 36f), () => view.Select(itemIndex));
+                Button button = CreateButton(panel.transform, "Item" + i, new Vector2(0f, 157f - i * 40f), new Vector2(450f, 36f), () => view.Select(itemIndex));
                 view.rows[i] = CreateText(button.transform, "Label", Vector2.zero, new Vector2(438f, 34f), 18f);
             }
-            view.sellButton = CreateButton(panel.transform, "Sell", new Vector2(-112f, -208f), new Vector2(210f, 43f), view.SellSelected);
+            view.sellButton = CreateButton(panel.transform, "Sell", new Vector2(-112f, -228f), new Vector2(210f, 43f), view.SellSelected);
             CreateText(view.sellButton.transform, "Label", Vector2.zero, new Vector2(208f, 42f), 18f).text = "Sell 1";
-            Button close = CreateButton(panel.transform, "Close", new Vector2(112f, -208f), new Vector2(210f, 43f), view.Close);
+            Button close = CreateButton(panel.transform, "Close", new Vector2(112f, -228f), new Vector2(210f, 43f), view.Close);
             CreateText(close.transform, "Label", Vector2.zero, new Vector2(208f, 42f), 18f).text = "Close";
             panel.SetActive(false);
             return view;

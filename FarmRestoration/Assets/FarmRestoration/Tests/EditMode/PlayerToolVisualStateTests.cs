@@ -9,6 +9,7 @@ namespace FarmRestoration.Tests.EditMode
         [TestCase(FarmTool.Seeds, "SeedsTool")]
         [TestCase(FarmTool.WateringCan, "WateringCanTool")]
         [TestCase(FarmTool.Harvest, "HarvestTool")]
+        [TestCase(FarmTool.Axe, "AxeTool")]
         public void GetVisualRootName_ReturnsStableNameForEveryTool(FarmTool tool, string expectedName)
         {
             Assert.That(PlayerToolVisualState.GetVisualRootName(tool), Is.EqualTo(expectedName));

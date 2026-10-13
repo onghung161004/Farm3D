@@ -144,7 +144,7 @@ namespace FarmRestoration
         {
             return player != null && session != null && !FishingSession.IsFishing
                 && !VillageOrderDialogue.IsOpen && !VillageResidentDialogue.IsOpen
-                && !FarmWarehouseView.IsOpen
+                && !FarmWarehouseView.IsOpen && !FarmQuestView.IsOpen && !FarmAudioSettingsView.IsOpen
                 && DistanceToPlayerSquared <= StartRange * StartRange;
         }
 

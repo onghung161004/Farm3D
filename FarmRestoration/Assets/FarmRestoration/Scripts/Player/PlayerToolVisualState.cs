@@ -12,6 +12,7 @@ namespace FarmRestoration
                 case FarmTool.Seeds: return "SeedsTool";
                 case FarmTool.WateringCan: return "WateringCanTool";
                 case FarmTool.Harvest: return "HarvestTool";
+                case FarmTool.Axe: return "AxeTool";
                 default: return "HoeTool";
             }
         }
